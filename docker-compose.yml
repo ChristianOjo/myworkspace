@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: myworkspace-pg
+    environment:
+      POSTGRES_USER: myworkspace
+      POSTGRES_PASSWORD: myworkspace
+      POSTGRES_DB: myworkspace
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myworkspace -d myworkspace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

@@ -1,0 +1,4 @@
+# myworkspace/.gitignore
+node_modules
+.env
+dist
