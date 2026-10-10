@@ -1,4 +1,3 @@
-// test/helpers.ts
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import { createAppPool } from '../src/db/pool.js';
@@ -36,6 +35,15 @@ export async function createLocation(orgId: string) {
   return res.rows[0].id;
 }
 
+export async function createLocationCustom(orgId: string, opts: { timezone?: string, openHour?: string, closeHour?: string }) {
+  const res = await testPool.query(
+    `INSERT INTO locations (org_id, name, timezone, open_hour, close_hour) 
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [orgId, `Location ${randomUUID()}`, opts.timezone || 'UTC', opts.openHour || '08:00', opts.closeHour || '20:00']
+  );
+  return res.rows[0].id;
+}
+
 export async function createResource(orgId: string, locationId: string) {
   const res = await testPool.query(
     `INSERT INTO resources (org_id, location_id, type, name, qr_token) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
@@ -63,6 +71,36 @@ export async function insertBooking({
     `INSERT INTO bookings (org_id, user_id, resource_id, period, status) 
      VALUES ($1, $2, $3, tstzrange($4, $5, '[)'), $6) RETURNING id`,
     [orgId, userId, resourceId, start, end, status]
+  );
+  return res.rows[0].id;
+}
+
+export async function createBlock(orgId: string, resourceId: string, start: string, end: string) {
+  const res = await testPool.query(
+    `INSERT INTO resource_blocks (org_id, resource_id, period) 
+     VALUES ($1, $2, tstzrange($3, $4, '[)')) RETURNING id`,
+    [orgId, resourceId, start, end]
+  );
+  return res.rows[0].id;
+}
+
+export async function setResourceStatus(resourceId: string, status: string) {
+  await testPool.query(`UPDATE resources SET status = $1 WHERE id = $2`, [status, resourceId]);
+}
+
+export async function deactivateUser(userId: string) {
+  await testPool.query(`UPDATE users SET deactivated_at = now() WHERE id = $1`, [userId]);
+}
+
+export async function setResourceRates(resourceId: string, hourlyRateCents: number, dayRateCents: number) {
+  await testPool.query(`UPDATE resources SET hourly_rate_cents = $1, day_rate_cents = $2 WHERE id = $3`, [hourlyRateCents, dayRateCents, resourceId]);
+}
+
+export async function createBookingRow(orgId: string, userId: string, resourceId: string) {
+  const res = await testPool.query(
+    `INSERT INTO bookings (org_id, user_id, resource_id, period, status) 
+     VALUES ($1, $2, $3, tstzrange('2030-01-07T09:00:00Z', '2030-01-07T10:00:00Z', '[)'), 'confirmed') RETURNING id`,
+    [orgId, userId, resourceId]
   );
   return res.rows[0].id;
 }
