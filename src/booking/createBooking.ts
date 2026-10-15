@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { withOrg } from '../db/withOrg.js';
+import { floorTo15 } from '../common/result.js';
 
 export interface CreateBookingInput {
   orgId: string;
@@ -11,6 +12,7 @@ export interface CreateBookingInput {
   date?: string;
   customerName?: string;
   customerPhone?: string;
+  arrivedNow?: boolean;
 }
 
 export interface Booking {
@@ -20,8 +22,9 @@ export interface Booking {
   resourceId: string;
   start: string;
   end: string;
-  status: 'confirmed';
+  status: 'confirmed' | 'checked_in';
   createdAt: string;
+  checkinAt: string | null;
   customerName: string | null;
   customerPhone: string | null;
   priceCents: number;
@@ -113,8 +116,14 @@ export async function createBooking(
   }
 
   const now = opts?.now || new Date();
-  if (kind === 'hourly' && startDate && startDate.getTime() < now.getTime()) {
+  if (kind === 'hourly' && startDate && startDate.getTime() < floorTo15(now).getTime()) {
     return { ok: false, http: 422, code: 'policy_violation', reason: 'in_the_past', message: 'In the past' };
+  }
+
+  if (input.arrivedNow && kind === 'hourly' && startDate) {
+    if (startDate.getTime() > now.getTime()) {
+      return { ok: false, http: 422, code: 'policy_violation', reason: 'arrived_before_start', message: 'Arrived before start' };
+    }
   }
 
   try {
@@ -199,6 +208,10 @@ export async function createBooking(
           return { ok: false, http: 422, code: 'policy_violation', reason: 'day_booking_not_offered', message: 'Day booking not offered' };
         }
 
+        if (input.arrivedNow && dayStart.getTime() > now.getTime()) {
+          return { ok: false, http: 422, code: 'policy_violation', reason: 'arrived_before_start', message: 'Arrived before start' };
+        }
+
         if (dayEnd.getTime() <= now.getTime()) {
           return { ok: false, http: 422, code: 'policy_violation', reason: 'in_the_past', message: 'In the past' };
         }
@@ -217,13 +230,30 @@ export async function createBooking(
         endIso = dayEnd.toISOString();
       }
 
+      const status = input.arrivedNow ? 'checked_in' : 'confirmed';
+      const checkinAt = input.arrivedNow ? now.toISOString() : null;
+
       const insertRes = await client.query(`
-        INSERT INTO bookings (org_id, user_id, resource_id, period, status, customer_name, customer_phone, price_cents, pricing_type)
-        VALUES ($1, $2, $3, tstzrange($4, $5, '[)'), 'confirmed', $6, $7, $8, $9)
-        RETURNING id, org_id, user_id, resource_id, lower(period) AS start, upper(period) AS "end", status, created_at, customer_name, customer_phone, price_cents, pricing_type
-      `, [input.orgId, input.userId, input.resourceId, startIso, endIso, cName, cPhone, priceCents, kind]);
+        INSERT INTO bookings (org_id, user_id, resource_id, period, status, checkin_at, customer_name, customer_phone, price_cents, pricing_type)
+        VALUES ($1, $2, $3, tstzrange($4, $5, '[)'), $6, $7, $8, $9, $10, $11)
+        RETURNING id, org_id, user_id, resource_id, lower(period) AS start, upper(period) AS "end", status, checkin_at, created_at, customer_name, customer_phone, price_cents, pricing_type
+      `, [input.orgId, input.userId, input.resourceId, startIso, endIso, status, checkinAt, cName, cPhone, priceCents, kind]);
 
       const row = insertRes.rows[0];
+      
+      await client.query(`
+        INSERT INTO audit_log (org_id, actor_id, action, entity, entity_id, diff)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [input.orgId, input.userId, 'booking.create', 'booking', row.id, JSON.stringify({
+        resourceId: input.resourceId,
+        start: startIso,
+        end: endIso,
+        priceCents,
+        pricing: kind,
+        customerName: cName,
+        arrivedNow: input.arrivedNow || false
+      })]);
+
       return {
         ok: true,
         booking: {
@@ -235,6 +265,7 @@ export async function createBooking(
           end: new Date(row.end).toISOString(),
           status: row.status,
           createdAt: new Date(row.created_at).toISOString(),
+          checkinAt: row.checkin_at ? new Date(row.checkin_at).toISOString() : null,
           customerName: row.customer_name,
           customerPhone: row.customer_phone,
           priceCents: row.price_cents,
@@ -245,7 +276,6 @@ export async function createBooking(
 
     return result;
   } catch (err: any) {
-    // Known limitation: a maintenance block created at the same instant as a booking is not protected by a constraint, because the two live in different tables.
     if (err.code === '23P01' || err.code === '40P01') {
       return { ok: false, http: 409, code: 'slot_conflict', reason: 'slot_taken', message: 'Slot just taken' };
     }

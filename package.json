@@ -6,9 +6,12 @@
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "migrate": "tsx src/db/migrate.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+	"create-org": "tsx scripts/create-org.ts",
+    "dev": "tsx src/http/server.ts"
   },
   "dependencies": {
+    "fastify": "^5.12.5",
     "pg": "^8.11.3"
   },
   "devDependencies": {

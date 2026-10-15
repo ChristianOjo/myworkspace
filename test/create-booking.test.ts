@@ -111,7 +111,7 @@ describe('create-booking', () => {
     const resourceId = await createResource(orgId, locationId);
 
     const input: CreateBookingInput = { orgId, userId, resourceId, start: '2029-01-01T09:00:00Z', end: '2029-01-01T10:00:00Z' };
-    const res = await createBooking(localAppPool, input, { now: new Date('2030-01-01T00:00:00Z') });
+    const res = await createBooking(localAppPool, input, { now: new Date('2029-01-01T10:00:00Z') });
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.http).toBe(422);

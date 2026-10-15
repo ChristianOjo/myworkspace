@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import { createAppPool } from '../src/db/pool.js';
+import { hashPassword } from '../src/auth/passwords.js';
 
 const testDbUrl = process.env.TEST_DATABASE_URL || 'postgres://myworkspace:myworkspace@localhost:5432/myworkspace_test';
 export const testPool = new Pool({ connectionString: testDbUrl, max: 25 });
@@ -103,6 +104,39 @@ export async function createBookingRow(orgId: string, userId: string, resourceId
     [orgId, userId, resourceId]
   );
   return res.rows[0].id;
+}
+
+export async function createStaff(orgId: string, role: string, fullName?: string) {
+  const name = fullName || `Staff ${randomUUID()}`;
+  const res = await testPool.query(
+    `INSERT INTO users (org_id, email, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [orgId, `staff-${randomUUID()}@example.com`, name, role]
+  );
+  return res.rows[0].id;
+}
+
+export async function insertPaymentAt(orgId: string, bookingId: string, receivedBy: string, kind: string, amountCents: number, createdAt: string) {
+  const res = await testPool.query(
+    `INSERT INTO payments (org_id, booking_id, received_by, kind, amount_cents, created_at) 
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [orgId, bookingId, receivedBy, kind, amountCents, createdAt]
+  );
+  return res.rows[0].id;
+}
+
+export async function auditRows(orgId: string, action?: string) {
+  if (action) {
+    const res = await testPool.query(
+      `SELECT * FROM audit_log WHERE org_id = $1 AND action = $2 ORDER BY id`,
+      [orgId, action]
+    );
+    return res.rows;
+  }
+  const res = await testPool.query(
+    `SELECT * FROM audit_log WHERE org_id = $1 ORDER BY id`,
+    [orgId]
+  );
+  return res.rows;
 }
 
 export async function seedTwoOrgs() {
@@ -208,4 +242,49 @@ export async function seedTwoOrgs() {
       bookingIds: [bookB1, bookB2],
     },
   };
+}
+
+export async function createUserWithPassword(orgId: string, opts: { email: string; role: string; password: string; fullName?: string }) {
+  const name = opts.fullName || `User ${opts.email}`;
+  const hash = await hashPassword(opts.password, { N: 1024 });
+  const res = await testPool.query(
+    `INSERT INTO users (org_id, email, full_name, role, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [orgId, opts.email, name, opts.role, hash]
+  );
+  return res.rows[0].id;
+}
+
+export async function getSessionRows(orgId: string) {
+  const res = await testPool.query(`SELECT * FROM sessions WHERE org_id = $1`, [orgId]);
+  return res.rows;
+}
+
+// ---- Step 6B helpers ----
+
+export async function loginAs(app: any, orgSlug: string, email: string, password: string): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    payload: { orgSlug, email, password },
+  });
+  if (res.statusCode !== 200) {
+    throw new Error(`loginAs failed with status ${res.statusCode}`);
+  }
+  return res.json().token;
+}
+
+export async function createStaffUser(
+  orgId: string,
+  role: string,
+  opts?: { email?: string; password?: string; fullName?: string }
+) {
+  const email = opts?.email ?? `staff-${randomUUID()}@example.com`;
+  const password = opts?.password ?? `pw-${randomUUID()}`;
+  const id = await createUserWithPassword(orgId, {
+    email,
+    role,
+    password,
+    fullName: opts?.fullName,
+  });
+  return { id, email, password };
 }
