@@ -1,3 +1,4 @@
+// test/sweepers.test.ts
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { testPool, appPool, createOrg, createUser, createLocationCustom, createResource, loginAs, auditRows } from './helpers.js';
 import { createOrgWithAdmin } from '../src/auth/bootstrap.js';
@@ -16,7 +17,7 @@ afterAll(async () => {
 
 describe('sweepers', () => {
   it('a confirmed hourly booking becomes no_show after the grace period', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-1', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -24,12 +25,14 @@ describe('sweepers', () => {
     const bookingId = await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status) VALUES ($1, $2, $3, tstzrange('2030-01-07T09:00:00Z', '2030-01-07T10:00:00Z', '[)'), 'confirmed') RETURNING id`, [orgId, userId, resId]).then(r => r.rows[0].id);
 
     clock = new Date('2030-01-07T09:14:59Z');
-    await runSweepers(appPool, { now: clock });
+    const result1 = await runSweepers(appPool, { now: clock });
+    expect(result1.errors).toEqual([]);
     let status = await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId]).then(r => r.rows[0].status);
     expect(status).toBe('confirmed');
 
     clock = new Date('2030-01-07T09:15:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result2 = await runSweepers(appPool, { now: clock });
+    expect(result2.errors).toEqual([]);
     status = await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId]).then(r => r.rows[0].status);
     expect(status).toBe('no_show');
 
@@ -40,7 +43,7 @@ describe('sweepers', () => {
   });
 
   it('an arrived booking is not a no_show', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-2', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -49,13 +52,14 @@ describe('sweepers', () => {
     await testPool.query(`UPDATE bookings SET status = 'checked_in' WHERE id = $1`, [bookingId]);
 
     clock = new Date('2030-01-07T09:30:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result = await runSweepers(appPool, { now: clock });
+    expect(result.errors).toEqual([]);
     const status = await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId]).then(r => r.rows[0].status);
     expect(status).toBe('checked_in');
   });
 
   it('a day booking becomes no_show only when the day ends', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-3', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC', openHour: '08:00', closeHour: '20:00' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -63,20 +67,23 @@ describe('sweepers', () => {
     const bookingId = await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status, pricing_type) VALUES ($1, $2, $3, tstzrange('2030-01-07T08:00:00Z', '2030-01-07T20:00:00Z', '[)'), 'confirmed', 'day') RETURNING id`, [orgId, userId, resId]).then(r => r.rows[0].id);
 
     clock = new Date('2030-01-07T12:00:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result1 = await runSweepers(appPool, { now: clock });
+    expect(result1.errors).toEqual([]);
     expect((await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId])).rows[0].status).toBe('confirmed');
 
     clock = new Date('2030-01-07T19:59:59Z');
-    await runSweepers(appPool, { now: clock });
+    const result2 = await runSweepers(appPool, { now: clock });
+    expect(result2.errors).toEqual([]);
     expect((await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId])).rows[0].status).toBe('confirmed');
 
     clock = new Date('2030-01-07T20:00:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result3 = await runSweepers(appPool, { now: clock });
+    expect(result3.errors).toEqual([]);
     expect((await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId])).rows[0].status).toBe('no_show');
   });
 
   it('checked_in bookings complete at their end time', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-4', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -84,11 +91,13 @@ describe('sweepers', () => {
     const bookingId = await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status) VALUES ($1, $2, $3, tstzrange('2030-01-07T09:00:00Z', '2030-01-07T10:00:00Z', '[)'), 'checked_in') RETURNING id`, [orgId, userId, resId]).then(r => r.rows[0].id);
 
     clock = new Date('2030-01-07T09:59:59Z');
-    await runSweepers(appPool, { now: clock });
+    const result1 = await runSweepers(appPool, { now: clock });
+    expect(result1.errors).toEqual([]);
     expect((await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId])).rows[0].status).toBe('checked_in');
 
     clock = new Date('2030-01-07T10:00:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result2 = await runSweepers(appPool, { now: clock });
+    expect(result2.errors).toEqual([]);
     expect((await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId])).rows[0].status).toBe('completed');
 
     const logs = await auditRows(orgId, 'booking.complete');
@@ -96,21 +105,22 @@ describe('sweepers', () => {
   });
 
   it('a no_show slot can be booked again', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-5', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
 
     await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status) VALUES ($1, $2, $3, tstzrange('2030-01-07T09:00:00Z', '2030-01-07T10:00:00Z', '[)'), 'confirmed')`, [orgId, userId, resId]);
     clock = new Date('2030-01-07T09:15:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result = await runSweepers(appPool, { now: clock });
+    expect(result.errors).toEqual([]);
 
     const newBooking = await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status) VALUES ($1, $2, $3, tstzrange('2030-01-07T09:30:00Z', '2030-01-07T10:30:00Z', '[)'), 'confirmed') RETURNING id`, [orgId, userId, resId]);
     expect(newBooking.rows.length).toBe(1);
   });
 
   it('paid no-shows keep their payments', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-6', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -119,15 +129,16 @@ describe('sweepers', () => {
     await testPool.query(`INSERT INTO payments (org_id, booking_id, amount_cents, kind, received_by) VALUES ($1, $2, 2000, 'payment', $3)`, [orgId, bookingId, userId]);
 
     clock = new Date('2030-01-07T09:15:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result = await runSweepers(appPool, { now: clock });
+    expect(result.errors).toEqual([]);
 
     const payCount = await testPool.query('SELECT count(*) FROM payments WHERE booking_id = $1', [bookingId]);
     expect(Number(payCount.rows[0].count)).toBe(1);
   });
 
   it('sweepers handle every org and keep orgs separate', async () => {
-    const { orgId: orgA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'a', adminEmail: 'a@a.a', adminName: 'A' });
-    const { orgId: orgB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'b', adminEmail: 'b@b.b', adminName: 'B' });
+    const { orgId: orgA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'sweep-7a', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId: orgB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'sweep-7b', adminEmail: 'b@b.b', adminName: 'B' });
     
     const setup = async (orgId: string) => {
       const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
@@ -140,6 +151,7 @@ describe('sweepers', () => {
 
     clock = new Date('2030-01-07T09:15:00Z');
     const result = await runSweepers(appPool, { now: clock });
+    expect(result.errors).toEqual([]);
     
     expect(result.orgs).toBeGreaterThanOrEqual(2);
     expect(result.noShows).toBe(2);
@@ -153,8 +165,8 @@ describe('sweepers', () => {
   });
 
   it('the sweeper and mark-arrived race leaves exactly one outcome', async () => {
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-race', adminEmail: 'a@a.a', adminName: 'A' });
     for (let i = 0; i < 5; i++) {
-      const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
       const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
       const resId = await createResource(orgId, locId);
       const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -162,23 +174,24 @@ describe('sweepers', () => {
       const bookingId = await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status) VALUES ($1, $2, $3, tstzrange('2030-01-07T09:00:00Z', '2030-01-07T10:00:00Z', '[)'), 'confirmed') RETURNING id`, [orgId, userId, resId]).then(r => r.rows[0].id);
 
       clock = new Date('2030-01-07T09:20:00Z');
-      await Promise.all([
+      const [arrivedRes, sweepRes] = await Promise.all([
         markArrived(appPool, { orgId, bookingId, actorUserId: userId }, { now: clock }),
         runSweepers(appPool, { now: clock })
       ]);
+      expect(sweepRes.errors).toEqual([]);
 
       const status = (await testPool.query('SELECT status FROM bookings WHERE id = $1', [bookingId])).rows[0].status;
       expect(['checked_in', 'no_show']).toContain(status);
 
       const logs = await auditRows(orgId);
-      const noShowLogs = logs.filter((l: any) => l.action === 'booking.no_show');
-      const arrivedLogs = logs.filter((l: any) => l.action === 'booking.arrived');
+      const noShowLogs = logs.filter((l: any) => l.action === 'booking.no_show' && l.entity_id === bookingId);
+      const arrivedLogs = logs.filter((l: any) => l.action === 'booking.arrived' && l.entity_id === bookingId);
       expect(noShowLogs.length + arrivedLogs.length).toBeLessThanOrEqual(1);
     }
   });
 
   it('running the sweepers twice changes nothing the second time', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-8', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -187,14 +200,16 @@ describe('sweepers', () => {
 
     clock = new Date('2030-01-07T09:15:00Z');
     const res1 = await runSweepers(appPool, { now: clock });
+    expect(res1.errors).toEqual([]);
     const res2 = await runSweepers(appPool, { now: clock });
+    expect(res2.errors).toEqual([]);
 
     expect(res2.noShows).toBe(0);
     expect(res2.completed).toBe(0);
   });
 
   it('the sweeper only touches due bookings', async () => {
-    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'sweep-9', adminEmail: 'a@a.a', adminName: 'A' });
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
     const userId = (await testPool.query('SELECT id FROM users WHERE org_id = $1 LIMIT 1', [orgId])).rows[0].id;
@@ -205,7 +220,8 @@ describe('sweepers', () => {
     await testPool.query(`INSERT INTO bookings (org_id, user_id, resource_id, period, status) VALUES ($1, $2, $3, tstzrange('2030-01-07T09:00:00Z', '2030-01-07T10:00:00Z', '[)'), 'no_show')`, [orgId, userId, resId]);
 
     clock = new Date('2030-01-07T09:15:00Z');
-    await runSweepers(appPool, { now: clock });
+    const result = await runSweepers(appPool, { now: clock });
+    expect(result.errors).toEqual([]);
 
     const counts = await testPool.query(`SELECT status, count(*) FROM bookings GROUP BY status`);
     const statusMap = Object.fromEntries(counts.rows.map((r: any) => [r.status, Number(r.count)]));
@@ -216,8 +232,8 @@ describe('sweepers', () => {
   });
 
   it('one failing org does not stop the others', async () => {
-    const { orgId: orgA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'a', adminEmail: 'a@a.a', adminName: 'A' });
-    const { orgId: orgB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'b', adminEmail: 'b@b.b', adminName: 'B' });
+    const { orgId: orgA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'sweep-10a', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId: orgB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'sweep-10b', adminEmail: 'b@b.b', adminName: 'B' });
     
     const setup = async (orgId: string) => {
       const locId = await createLocationCustom(orgId, { timezone: 'UTC' });

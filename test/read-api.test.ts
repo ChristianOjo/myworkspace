@@ -1,3 +1,4 @@
+// test/read-api.test.ts
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { testPool, appPool, createOrg, createUser, createLocationCustom, createResource, setResourceRates, loginAs, createStaffUser } from './helpers.js';
 import { buildApp } from '../src/http/app.js';
@@ -17,9 +18,10 @@ afterAll(async () => {
 
 describe('read-api', () => {
   it('locations and resources list only the caller\'s org', async () => {
-    const { orgId: orgA, password: passA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'a', adminEmail: 'a@a.a', adminName: 'A' });
-    const { orgId: orgB, password: passB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'b', adminEmail: 'b@b.b', adminName: 'B' });
-    const tokenA = await loginAs(app, 'a', 'a@a.a', passA);
+    const { orgId: orgA, password: passA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'org-a', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId: orgB, password: passB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'org-b', adminEmail: 'b@b.b', adminName: 'B' });
+    const tokenA = await loginAs(app, 'org-a', 'a@a.a', passA);
+    const tokenB = await loginAs(app, 'org-b', 'b@b.b', passB);
     
     const locA = await createLocationCustom(orgA, { timezone: 'UTC', openHour: '08:00', closeHour: '20:00' });
     const resA1 = await createResource(orgA, locA);
@@ -32,9 +34,17 @@ describe('read-api', () => {
     const locB = await createLocationCustom(orgB, { timezone: 'UTC' });
     const resB = await createResource(orgB, locB);
 
-    const locRes = await app.inject({ method: 'GET', url: '/api/v1/locations', headers: { Authorization: `Bearer ${tokenA}` } });
-    expect(locRes.statusCode).toBe(200);
-    expect(locRes.json().locations.length).toBe(1);
+    const locResA = await app.inject({ method: 'GET', url: '/api/v1/locations', headers: { Authorization: `Bearer ${tokenA}` } });
+    expect(locResA.statusCode).toBe(200);
+    const locIdsA = locResA.json().locations.map((l: any) => l.id);
+    expect(locIdsA).toContain(locA);
+    expect(locIdsA).not.toContain(locB);
+
+    const locResB = await app.inject({ method: 'GET', url: '/api/v1/locations', headers: { Authorization: `Bearer ${tokenB}` } });
+    expect(locResB.statusCode).toBe(200);
+    const locIdsB = locResB.json().locations.map((l: any) => l.id);
+    expect(locIdsB).toContain(locB);
+    expect(locIdsB).not.toContain(locA);
 
     const resRes = await app.inject({ method: 'GET', url: `/api/v1/resources?locationId=${locA}`, headers: { Authorization: `Bearer ${tokenA}` } });
     expect(resRes.statusCode).toBe(200);
@@ -133,10 +143,15 @@ describe('read-api', () => {
     
     const locId = await createLocationCustom(orgId, { timezone: 'UTC' });
     const resId = await createResource(orgId, locId);
+    await setResourceRates(resId, 5000, 40000);
     const createRes = await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${adminToken}` }, payload: { resourceId: resId, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'John' } });
+    expect(createRes.statusCode).toBe(201);
     const bookingId = createRes.json().booking.id;
 
-    await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${memberToken}` }, payload: { amountCents: 2000 } });
+    const payRes = await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${memberToken}` }, payload: { amountCents: 2000 } });
+    expect(payRes.statusCode).toBe(201);
+
+    await testPool.query(`UPDATE payments SET created_at = '2030-01-07T10:00:00Z' WHERE org_id = $1`, [orgId]);
 
     const memberReport = await app.inject({ method: 'GET', url: `/api/v1/cash/daily?locationId=${locId}&date=2030-01-07`, headers: { Authorization: `Bearer ${memberToken}` } });
     expect(memberReport.json().staff.length).toBe(1);

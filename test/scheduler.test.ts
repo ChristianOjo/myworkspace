@@ -1,3 +1,4 @@
+// test/scheduler.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createScheduler } from '../src/jobs/scheduler.js';
 
@@ -66,15 +67,13 @@ describe('scheduler', () => {
     scheduler.start();
     scheduler.start(); // Should not create a second timer
     
-    vi.advanceTimersByTime(1000);
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(1000);
     expect(runCount).toBe(1);
 
     scheduler.stop();
     scheduler.stop(); // Safe to call twice
     
-    vi.advanceTimersByTime(1000);
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(1000);
     expect(runCount).toBe(1);
   });
 });

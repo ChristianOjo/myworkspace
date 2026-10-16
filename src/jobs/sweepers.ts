@@ -8,7 +8,7 @@ export async function runSweepers(
   const now = opts?.now || new Date();
   const graceMinutes = opts?.graceMinutes ?? 15;
 
-  const orgRes = await pool.query(`SELECT * FROM list_org_ids()`);
+  const orgRes = await pool.query(`SELECT id FROM list_org_ids() AS t(id)`);
   const orgIds = orgRes.rows.map((r: any) => r.id);
 
   let totalNoShows = 0;

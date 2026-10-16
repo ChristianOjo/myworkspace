@@ -1,3 +1,4 @@
+// test/booking-api.test.ts
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { testPool, appPool, createOrg, createUser, createLocation, createResource, setResourceRates, loginAs, createStaffUser, auditRows } from './helpers.js';
 import { buildApp } from '../src/http/app.js';
@@ -44,13 +45,15 @@ describe('booking-api', () => {
     const { orgId, adminUserId, password } = await createOrgWithAdmin(testPool, { orgName: 'Test', slug: 'test', adminEmail: 'a@a.a', adminName: 'A' });
     const token = await loginAs(app, 'test', 'a@a.a', password);
     const locId = await createLocation(orgId);
-    const resId = await createResource(orgId, locId);
-    await setResourceRates(resId, 5000, 40000);
+    const resId1 = await createResource(orgId, locId);
+    const resId2 = await createResource(orgId, locId);
+    await setResourceRates(resId1, 5000, 40000);
+    await setResourceRates(resId2, 5000, 40000);
 
     const dayRes = await app.inject({
       method: 'POST', url: '/api/v1/bookings',
       headers: { Authorization: `Bearer ${token}` },
-      payload: { resourceId: resId, kind: 'day', date: '2030-01-07', customerName: 'Jane' }
+      payload: { resourceId: resId1, kind: 'day', date: '2030-01-07', customerName: 'Jane' }
     });
     expect(dayRes.statusCode).toBe(201);
     expect(dayRes.json().booking.pricing).toBe('day');
@@ -60,7 +63,7 @@ describe('booking-api', () => {
     const walkInRes = await app.inject({
       method: 'POST', url: '/api/v1/bookings',
       headers: { Authorization: `Bearer ${token}` },
-      payload: { resourceId: resId, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'Walk', arrivedNow: true }
+      payload: { resourceId: resId2, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'Walk', arrivedNow: true }
     });
     expect(walkInRes.statusCode).toBe(201);
     expect(walkInRes.json().booking.status).toBe('checked_in');
@@ -87,6 +90,7 @@ describe('booking-api', () => {
     const token = await loginAs(app, 'test', 'a@a.a', password);
     const locId = await createLocation(orgId);
     const resId = await createResource(orgId, locId);
+    await setResourceRates(resId, 5000, 40000);
 
     const payload = { resourceId: resId, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'John' };
     await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${token}` }, payload });
@@ -95,7 +99,7 @@ describe('booking-api', () => {
     expect(conflictRes.statusCode).toBe(409);
     expect(conflictRes.json().error.code).toBe('slot_conflict');
 
-    const hoursRes = await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${token}` }, payload: { ...payload, start: '2030-01-07T07:00:00Z', end: '2030-01-07T08:00:00Z' } });
+    const hoursRes = await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${token}` }, payload: { ...payload, start: '2030-01-08T06:00:00Z', end: '2030-01-08T07:00:00Z' } });
     expect(hoursRes.statusCode).toBe(422);
     expect(hoursRes.json().error.reason).toBe('outside_hours');
 
@@ -182,10 +186,13 @@ describe('booking-api', () => {
     
     const locId = await createLocation(orgId);
     const resId = await createResource(orgId, locId);
+    await setResourceRates(resId, 5000, 40000);
     const createRes = await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${adminToken}` }, payload: { resourceId: resId, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'John' } });
+    expect(createRes.statusCode).toBe(201);
     const bookingId = createRes.json().booking.id;
 
-    await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${adminToken}` }, payload: { amountCents: 2000 } });
+    const payRes = await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${adminToken}` }, payload: { amountCents: 2000 } });
+    expect(payRes.statusCode).toBe(201);
 
     const memberCancelRes = await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/cancel`, headers: { Authorization: `Bearer ${memberToken}` }, payload: { refundCents: 1000 } });
     expect(memberCancelRes.statusCode).toBe(403);
@@ -204,7 +211,9 @@ describe('booking-api', () => {
     
     const locId = await createLocation(orgId);
     const resId = await createResource(orgId, locId);
+    await setResourceRates(resId, 5000, 40000);
     const createRes = await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${adminToken}` }, payload: { resourceId: resId, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'John' } });
+    expect(createRes.statusCode).toBe(201);
     const bookingId = createRes.json().booking.id;
 
     const payRes = await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${adminToken}` }, payload: { amountCents: 2000 } });
@@ -228,11 +237,15 @@ describe('booking-api', () => {
     const token = await loginAs(app, 'test', 'a@a.a', password);
     const locId = await createLocation(orgId);
     const resId = await createResource(orgId, locId);
+    await setResourceRates(resId, 5000, 40000);
     const createRes = await app.inject({ method: 'POST', url: '/api/v1/bookings', headers: { Authorization: `Bearer ${token}` }, payload: { resourceId: resId, start: '2030-01-07T09:00:00Z', end: '2030-01-07T10:00:00Z', customerName: 'John' } });
+    expect(createRes.statusCode).toBe(201);
     const bookingId = createRes.json().booking.id;
 
-    await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${token}` }, payload: { amountCents: 2000, note: 'Cash' } });
-    await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/refunds`, headers: { Authorization: `Bearer ${token}` }, payload: { amountCents: 500 } });
+    const payRes = await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/payments`, headers: { Authorization: `Bearer ${token}` }, payload: { amountCents: 2000, note: 'Cash' } });
+    expect(payRes.statusCode).toBe(201);
+    const refRes = await app.inject({ method: 'POST', url: `/api/v1/bookings/${bookingId}/refunds`, headers: { Authorization: `Bearer ${token}` }, payload: { amountCents: 500 } });
+    expect(refRes.statusCode).toBe(201);
 
     const detailRes = await app.inject({ method: 'GET', url: `/api/v1/bookings/${bookingId}`, headers: { Authorization: `Bearer ${token}` } });
     expect(detailRes.statusCode).toBe(200);
@@ -243,10 +256,10 @@ describe('booking-api', () => {
   });
 
   it('an unknown booking id and another org\'s booking id return identical 404s', async () => {
-    const { orgId: orgA, password: passA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'a', adminEmail: 'a@a.a', adminName: 'A' });
-    const { orgId: orgB, password: passB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'b', adminEmail: 'b@b.b', adminName: 'B' });
-    const tokenA = await loginAs(app, 'a', 'a@a.a', passA);
-    const tokenB = await loginAs(app, 'b', 'b@b.b', passB);
+    const { orgId: orgA, password: passA } = await createOrgWithAdmin(testPool, { orgName: 'A', slug: 'org-a', adminEmail: 'a@a.a', adminName: 'A' });
+    const { orgId: orgB, password: passB } = await createOrgWithAdmin(testPool, { orgName: 'B', slug: 'org-b', adminEmail: 'b@b.b', adminName: 'B' });
+    const tokenA = await loginAs(app, 'org-a', 'a@a.a', passA);
+    const tokenB = await loginAs(app, 'org-b', 'b@b.b', passB);
 
     const locIdB = await createLocation(orgB);
     const resIdB = await createResource(orgB, locIdB);

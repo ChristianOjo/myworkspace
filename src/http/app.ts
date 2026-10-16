@@ -1,3 +1,4 @@
+// src/http/app.ts
 import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Pool } from 'pg';
 import { login } from '../auth/login.js';
@@ -333,7 +334,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     });
 
     app.post('/api/v1/bookings/:id/arrived', {
-      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false }
+      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false },
+      preValidation: (request, reply, done) => {
+        if (request.body !== undefined && (typeof request.body !== 'object' || request.body === null || Object.keys(request.body).length > 0)) {
+          return reply.code(400).send({ error: { code: 'validation_error', message: 'Invalid request' } });
+        }
+        done();
+      }
     }, async (request, reply) => {
       const auth = (request as any).auth;
       const params = request.params as any;
@@ -364,7 +371,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     });
 
     app.post('/api/v1/bookings/:id/release', {
-      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false }
+      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false },
+      preValidation: (request, reply, done) => {
+        if (request.body !== undefined && (typeof request.body !== 'object' || request.body === null || Object.keys(request.body).length > 0)) {
+          return reply.code(400).send({ error: { code: 'validation_error', message: 'Invalid request' } });
+        }
+        done();
+      }
     }, async (request, reply) => {
       const auth = (request as any).auth;
       const params = request.params as any;
