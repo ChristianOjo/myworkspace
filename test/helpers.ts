@@ -1,3 +1,4 @@
+// test/helpers.ts
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import { createAppPool } from '../src/db/pool.js';
@@ -259,32 +260,26 @@ export async function getSessionRows(orgId: string) {
   return res.rows;
 }
 
-// ---- Step 6B helpers ----
-
 export async function loginAs(app: any, orgSlug: string, email: string, password: string): Promise<string> {
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/login',
-    payload: { orgSlug, email, password },
+    payload: { orgSlug, email, password }
   });
-  if (res.statusCode !== 200) {
-    throw new Error(`loginAs failed with status ${res.statusCode}`);
-  }
+  if (res.statusCode !== 200) throw new Error(`Login failed: ${res.statusCode} ${res.body}`);
   return res.json().token;
 }
 
-export async function createStaffUser(
-  orgId: string,
-  role: string,
-  opts?: { email?: string; password?: string; fullName?: string }
-) {
-  const email = opts?.email ?? `staff-${randomUUID()}@example.com`;
-  const password = opts?.password ?? `pw-${randomUUID()}`;
-  const id = await createUserWithPassword(orgId, {
-    email,
-    role,
-    password,
-    fullName: opts?.fullName,
-  });
+export async function createStaffUser(orgId: string, role: string, opts?: { email?: string; password?: string; fullName?: string }) {
+  const email = opts?.email || `staff-${randomUUID()}@example.com`;
+  const password = opts?.password || 'password123456';
+  const fullName = opts?.fullName || `Staff ${role}`;
+  const id = await createUserWithPassword(orgId, { email, role, password, fullName });
   return { id, email, password };
+}
+
+export async function createResourceWithRates(orgId: string, locationId: string, hourly: number, daily: number) {
+  const id = await createResource(orgId, locationId);
+  await setResourceRates(id, hourly, daily);
+  return id;
 }

@@ -12,6 +12,7 @@ import { createBooking } from '../booking/createBooking.js';
 import { markArrived, cancelBooking, releaseBooking } from '../booking/actions.js';
 import { recordPayment, recordRefund } from '../cash/payments.js';
 import { dailyCashReport } from '../cash/report.js';
+import { createLocation, updateLocation, createResource, updateResource, listBlocks, createBlock, deleteBlock } from '../catalog/catalog.js';
 
 interface AppDeps {
   pool: Pool;
@@ -58,7 +59,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const origin = request.headers.origin;
     if (origin && deps.corsOrigins && deps.corsOrigins.includes(origin)) {
       reply.header('Access-Control-Allow-Origin', origin);
-      reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      reply.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
       reply.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
       reply.header('Access-Control-Max-Age', '600');
       reply.header('Vary', 'Origin');
@@ -242,11 +243,60 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return { locations: result.locations };
     });
 
+    app.post('/api/v1/locations', {
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', maxLength: 1000 },
+            timezone: { type: 'string', maxLength: 1000 },
+            openHour: { type: 'string', maxLength: 1000 },
+            closeHour: { type: 'string', maxLength: 1000 }
+          },
+          required: ['name', 'timezone', 'openHour', 'closeHour'],
+          additionalProperties: false
+        }
+      }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const body = request.body as any;
+      const result = await createLocation(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, ...body }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return reply.code(201).send({ location: result.location });
+    });
+
+    app.patch('/api/v1/locations/:id', {
+      schema: {
+        params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } },
+        body: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', maxLength: 1000 },
+            timezone: { type: 'string', maxLength: 1000 },
+            openHour: { type: 'string', maxLength: 1000 },
+            closeHour: { type: 'string', maxLength: 1000 }
+          },
+          minProperties: 1,
+          additionalProperties: false
+        }
+      }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const params = request.params as any;
+      const body = request.body as any;
+      const result = await updateLocation(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, locationId: params.id, ...body }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return { location: result.location };
+    });
+
     app.get('/api/v1/resources', {
       schema: {
         querystring: {
           type: 'object',
-          properties: { locationId: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } },
+          properties: { 
+            locationId: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' },
+            includeRetired: { type: 'string', enum: ['true', 'false'] }
+          },
           required: ['locationId'],
           additionalProperties: false
         }
@@ -254,9 +304,64 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     }, async (request, reply) => {
       const auth = (request as any).auth;
       const query = request.query as any;
-      const result = await listResources(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, locationId: query.locationId });
+      const result = await listResources(deps.pool, { 
+        orgId: auth.orgId, 
+        actorUserId: auth.userId, 
+        locationId: query.locationId,
+        includeRetired: query.includeRetired === 'true'
+      });
       if (!result.ok) return sendFailure(reply, result);
       return { resources: result.resources };
+    });
+
+    app.post('/api/v1/resources', {
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            locationId: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' },
+            type: { type: 'string', maxLength: 1000 },
+            name: { type: 'string', maxLength: 1000 },
+            capacity: { type: 'integer' },
+            hourlyRateCents: { type: 'integer' },
+            dayRateCents: { type: 'integer' },
+            status: { type: 'string', maxLength: 1000 }
+          },
+          required: ['locationId', 'type', 'name', 'hourlyRateCents', 'dayRateCents'],
+          additionalProperties: false
+        }
+      }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const body = request.body as any;
+      const result = await createResource(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, ...body }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return reply.code(201).send({ resource: result.resource });
+    });
+
+    app.patch('/api/v1/resources/:id', {
+      schema: {
+        params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } },
+        body: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', maxLength: 1000 },
+            capacity: { type: 'integer' },
+            hourlyRateCents: { type: 'integer' },
+            dayRateCents: { type: 'integer' },
+            status: { type: 'string', maxLength: 1000 }
+          },
+          minProperties: 1,
+          additionalProperties: false
+        }
+      }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const params = request.params as any;
+      const body = request.body as any;
+      const result = await updateResource(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, resourceId: params.id, ...body }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return { resource: result.resource, activeFutureBookings: result.activeFutureBookings };
     });
 
     app.get('/api/v1/bookings', {
@@ -448,6 +553,49 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       const result = await dailyCashReport(deps.pool, { orgId: auth.orgId, locationId: query.locationId, date: query.date, actorUserId: auth.userId }, { now: nowFn() });
       if (!result.ok) return sendFailure(reply, result);
       return { date: result.date, locationId: result.locationId, timezone: result.timezone, staff: result.staff, totals: result.totals };
+    });
+
+    app.get('/api/v1/resources/:id/blocks', {
+      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const params = request.params as any;
+      const result = await listBlocks(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, resourceId: params.id }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return { blocks: result.blocks };
+    });
+
+    app.post('/api/v1/resources/:id/blocks', {
+      schema: {
+        params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } },
+        body: {
+          type: 'object',
+          properties: {
+            start: { type: 'string', maxLength: 1000 },
+            end: { type: 'string', maxLength: 1000 },
+            reason: { type: 'string', maxLength: 1000 }
+          },
+          required: ['start', 'end'],
+          additionalProperties: false
+        }
+      }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const params = request.params as any;
+      const body = request.body as any;
+      const result = await createBlock(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, resourceId: params.id, ...body }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return reply.code(201).send({ block: result.block });
+    });
+
+    app.delete('/api/v1/blocks/:id', {
+      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false }
+    }, async (request, reply) => {
+      const auth = (request as any).auth;
+      const params = request.params as any;
+      const result = await deleteBlock(deps.pool, { orgId: auth.orgId, actorUserId: auth.userId, blockId: params.id }, { now: nowFn() });
+      if (!result.ok) return sendFailure(reply, result);
+      return reply.code(204).send();
     });
   });
 

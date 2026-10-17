@@ -1,3 +1,4 @@
+// src/read/queries.ts
 import { Pool } from 'pg';
 import { withOrg } from '../db/withOrg.js';
 import { loadActor, fail, Failure, isUuid } from '../common/result.js';
@@ -36,7 +37,7 @@ export async function listLocations(
 
 export async function listResources(
   pool: Pool,
-  input: { orgId: string; actorUserId: string; locationId: string }
+  input: { orgId: string; actorUserId: string; locationId: string; includeRetired?: boolean }
 ): Promise<{ ok: true; resources: Array<{ id: string; locationId: string; type: string; name: string; capacity: number; status: string; hourlyRateCents: number; dayRateCents: number }> } | Failure> {
   if (!isUuid(input.actorUserId) || !isUuid(input.locationId)) return fail(400, 'validation_error', 'Invalid ID', 'invalid_id');
 
@@ -53,9 +54,9 @@ export async function listResources(
       const res = await client.query(`
         SELECT id, location_id, type, name, capacity, status, hourly_rate_cents, day_rate_cents
         FROM resources
-        WHERE location_id = $1 AND status != 'retired'
+        WHERE location_id = $1 AND ($2 = true OR status != 'retired')
         ORDER BY type, name, id
-      `, [input.locationId]);
+      `, [input.locationId, input.includeRetired === true]);
 
       return {
         ok: true,

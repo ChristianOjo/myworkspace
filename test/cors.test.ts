@@ -1,3 +1,4 @@
+// test/cors.test.ts
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { testPool, appPool } from './helpers.js';
 import { buildApp } from '../src/http/app.js';
@@ -40,6 +41,8 @@ describe('cors', () => {
     expect(resAllowed.statusCode).toBe(204);
     expect(resAllowed.headers['access-control-allow-origin']).toBe('http://localhost:5173');
     expect(resAllowed.headers['access-control-allow-methods']).toContain('POST');
+    expect(resAllowed.headers['access-control-allow-methods']).toContain('PATCH');
+    expect(resAllowed.headers['access-control-allow-methods']).toContain('DELETE');
     expect(resAllowed.headers['access-control-allow-headers']).toContain('Authorization');
     expect(resAllowed.headers['access-control-max-age']).toBe('600');
 
