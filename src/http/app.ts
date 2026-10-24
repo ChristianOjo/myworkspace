@@ -13,6 +13,7 @@ import { markArrived, cancelBooking, releaseBooking } from '../booking/actions.j
 import { recordPayment, recordRefund } from '../cash/payments.js';
 import { dailyCashReport } from '../cash/report.js';
 import { createLocation, updateLocation, createResource, updateResource, listBlocks, createBlock, deleteBlock } from '../catalog/catalog.js';
+import { registerStatic } from './static.js';
 
 interface AppDeps {
   pool: Pool;
@@ -20,6 +21,9 @@ interface AppDeps {
   limiter?: LoginLimiter;
   verifyPassword?: typeof verifyPassword;
   corsOrigins?: string[];
+  staticDir?: string;
+  production?: boolean;
+  logger?: boolean | object;
 }
 
 function sendFailure(reply: FastifyReply, failure: Failure) {
@@ -33,8 +37,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     }
   }
 
+  const loggerConfig = deps.logger !== undefined ? deps.logger : false;
+
   const app = Fastify({
-    logger: false,
+    logger: loggerConfig,
     bodyLimit: 102400,
     trustProxy: process.env.TRUST_PROXY === 'true',
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } }
@@ -44,8 +50,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const limiter = deps.limiter || new LoginLimiter({ now: nowFn });
 
   app.addHook('onSend', async (request, reply, payload) => {
-    reply.header('Cache-Control', 'no-store');
+    if (!reply.hasHeader('cache-control')) {
+      reply.header('Cache-Control', 'no-store');
+    }
     reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'no-referrer');
+    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    
+    if (deps.production) {
+      reply.header('Strict-Transport-Security', 'max-age=15552000');
+    }
     
     const origin = request.headers.origin;
     if (origin && deps.corsOrigins && deps.corsOrigins.includes(origin)) {
@@ -81,6 +96,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.code(400).send({ error: { code: 'validation_error', message: 'Invalid request' } });
     }
 
+    request.log.error(`${error.message}\n${error.stack}`);
     return reply.code(500).send({ error: { code: 'internal_error', message: 'Something went wrong' } });
   });
 
@@ -598,6 +614,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.code(204).send();
     });
   });
+
+  if (deps.staticDir) {
+    registerStatic(app, deps.staticDir);
+  }
 
   return app;
 }

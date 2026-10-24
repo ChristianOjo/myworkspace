@@ -1,7 +1,7 @@
 import type { ApiErrorBody } from './types';
 
-const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
-export const API_BASE_URL = (configuredBase || 'http://127.0.0.1:3000').replace(/\/+$/, '');
+const configuredBase = import.meta.env.VITE_API_BASE_URL;
+export const API_BASE_URL = (configuredBase ?? 'http://127.0.0.1:3000').trim().replace(/\/+$/, '');
 const API_ROOT = `${API_BASE_URL}/api/v1`;
 const TOKEN_KEY = 'myworkspace.frontdesk.session';
 

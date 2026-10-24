@@ -1,62 +1,74 @@
-// myworkspace/src/db/migrate.ts
+// src/db/migrate.ts
 import { Pool } from 'pg';
-import { readdir, readFile } from 'fs/promises';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createPool } from './pool.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+function getMigrationsDir(): string {
+  if (process.env.MIGRATIONS_DIR) {
+    return process.env.MIGRATIONS_DIR;
+  }
+  return path.resolve(process.cwd(), 'migrations');
+}
 
 export async function migrate(pool: Pool): Promise<string[]> {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      filename text PRIMARY KEY,
-      applied_at timestamptz DEFAULT now()
-    )
-  `);
-
-  const migrationsDir = join(__dirname, '../../migrations');
-  const files = await readdir(migrationsDir);
-  const sqlFiles = files.filter(f => f.endsWith('.sql')).sort();
-
-  const appliedRes = await pool.query('SELECT filename FROM schema_migrations');
-  const appliedFilenames = new Set(appliedRes.rows.map((r: any) => r.filename));
-
-  const newlyApplied: string[] = [];
-
-  for (const file of sqlFiles) {
-    if (!appliedFilenames.has(file)) {
-      const filePath = join(migrationsDir, file);
-      const sql = await readFile(filePath, 'utf-8');
+  const dir = getMigrationsDir();
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+  
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename text PRIMARY KEY,
+        applied_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    
+    const applied = await client.query('SELECT filename FROM schema_migrations');
+    const appliedSet = new Set(applied.rows.map((r: any) => r.filename));
+    
+    const newlyApplied: string[] = [];
+    
+    for (const file of files) {
+      if (appliedSet.has(file)) continue;
       
-      await pool.query('BEGIN');
+      const sql = fs.readFileSync(path.join(dir, file), 'utf8');
+      await client.query('BEGIN');
       try {
-        await pool.query(sql);
-        await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
-        await pool.query('COMMIT');
+        await client.query(sql);
+        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
+        await client.query('COMMIT');
         newlyApplied.push(file);
-        console.log(`Applied migration: ${file}`);
       } catch (err) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         throw err;
       }
     }
+    
+    return newlyApplied;
+  } finally {
+    client.release();
   }
-
-  return newlyApplied;
 }
 
-const mainPath = fileURLToPath(import.meta.url).replace(/\\/g, '/');
-const argPath = (process.argv[1] || '').replace(/\\/g, '/');
+const __filename = fileURLToPath(import.meta.url);
+const scriptArg = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const isDirectRun = scriptArg === __filename || 
+                    scriptArg === __filename.replace(/\.ts$/, '.js') ||
+                    scriptArg.endsWith('/migrate.ts') ||
+                    scriptArg.endsWith('/migrate.js');
 
-if (argPath === mainPath) {
-  const { createPool } = await import('./pool.js');
+if (isDirectRun) {
   const pool = createPool();
-  try {
-    const applied = await migrate(pool);
-    if (applied.length === 0) {
-      console.log('No new migrations to apply.');
-    }
-  } finally {
-    await pool.end();
-  }
+  migrate(pool)
+    .then(applied => {
+      console.log(`Applied ${applied.length} migration(s):`);
+      applied.forEach(f => console.log(`  ${f}`));
+      return pool.end();
+    })
+    .catch(err => {
+      console.error('Migration failed:', err);
+      pool.end().then(() => process.exit(1));
+    });
 }

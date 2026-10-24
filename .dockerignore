@@ -1,0 +1,11 @@
+# .dockerignore
+node_modules
+dist
+web/node_modules
+web/dist
+.git
+.env
+test
+*.md
+**/.env
+**/.env.*
