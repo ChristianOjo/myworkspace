@@ -1,6 +1,8 @@
-// test/ops.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Pool } from 'pg';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { testPool } from './helpers.js';
 import { runPreflight } from '../src/ops/preflight.js';
 import { setRolePassword } from '../src/ops/appPassword.js';
@@ -34,28 +36,64 @@ describe('ops', () => {
     const roleName = `test_role_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
     const newPassword = 'newpassword123456789';
     const wrongPassword = 'wrongpassword123456789';
+    const shortPassword = '123456789012345';
     
     try {
       await testPool.query(`CREATE ROLE ${roleName} WITH LOGIN PASSWORD 'initial'`);
       
       await setRolePassword(testPool, roleName, newPassword);
       
-      const testDbUrl = process.env.TEST_DATABASE_URL || 'postgres://myworkspace:myworkspace@localhost:5432/myworkspace_test';
-      const baseUrl = testDbUrl.replace(/\/\/[^@]+@/, '//');
-      const newUrl = `postgres://${roleName}:${newPassword}@${baseUrl.split('@')[1]}`;
-      const wrongUrl = `postgres://${roleName}:${wrongPassword}@${baseUrl.split('@')[1]}`;
+      const base = new URL(process.env.TEST_DATABASE_URL ?? 'postgres://myworkspace:myworkspace@localhost:5432/myworkspace_test');
       
-      const newPool = new Pool({ connectionString: newUrl, max: 1 });
-      const res1 = await newPool.query('SELECT 1');
-      expect(res1.rows[0]).toBeDefined();
-      await newPool.end();
+      const newUrl = new URL(base.toString());
+      newUrl.username = roleName;
+      newUrl.password = newPassword;
       
-      const wrongPool = new Pool({ connectionString: wrongUrl, max: 1 });
-      await expect(wrongPool.query('SELECT 1')).rejects.toThrow();
-      await wrongPool.end();
+      const newPool = new Pool({ connectionString: newUrl.toString(), max: 1 });
+      try {
+        const res1 = await newPool.query('SELECT 1');
+        expect(res1.rows[0]).toBeDefined();
+      } finally {
+        await newPool.end();
+      }
       
-      await expect(setRolePassword(testPool, 'INVALID-ROLE', newPassword)).rejects.toThrow(/Invalid role name/);
-      await expect(setRolePassword(testPool, roleName, 'short')).rejects.toThrow(/Password must be between 16 and 200 characters/);
+      const wrongUrl = new URL(base.toString());
+      wrongUrl.username = roleName;
+      wrongUrl.password = wrongPassword;
+      
+      const wrongPool = new Pool({ connectionString: wrongUrl.toString(), max: 1 });
+      try {
+        let caughtErr: any = null;
+        try {
+          await wrongPool.query('SELECT 1');
+        } catch (e: any) {
+          caughtErr = e;
+        }
+        expect(caughtErr).not.toBeNull();
+        expect(caughtErr.code).toBe('28P01');
+      } finally {
+        await wrongPool.end();
+      }
+      
+      let badRoleErr: any = null;
+      try {
+        await setRolePassword(testPool, 'INVALID-ROLE', newPassword);
+      } catch (e: any) {
+        badRoleErr = e;
+      }
+      expect(badRoleErr).not.toBeNull();
+      expect(badRoleErr.message).toMatch(/Invalid role name/);
+      expect(badRoleErr.message).not.toContain(newPassword);
+      
+      let shortPassErr: any = null;
+      try {
+        await setRolePassword(testPool, roleName, shortPassword);
+      } catch (e: any) {
+        shortPassErr = e;
+      }
+      expect(shortPassErr).not.toBeNull();
+      expect(shortPassErr.message).toMatch(/Password must be between 16 and 200 characters/);
+      expect(shortPassErr.message).not.toContain(shortPassword);
       
     } finally {
       await testPool.query(`DROP ROLE IF EXISTS ${roleName}`);
@@ -63,18 +101,26 @@ describe('ops', () => {
   });
 
   it('migrate runs from any working directory with MIGRATIONS_DIR', async () => {
-    const originalCwd = process.cwd();
-    const migrationsDir = process.cwd() + '/migrations';
+    const tempDir = mkdtempSync(path.join(tmpdir(), 'migrate-test-'));
+    const noopFile = path.join(tempDir, 'zz_test_noop.sql');
+    writeFileSync(noopFile, 'SELECT 1;');
+    
+    const originalMigrationsDir = process.env.MIGRATIONS_DIR;
+    process.env.MIGRATIONS_DIR = tempDir;
     
     try {
-      process.chdir('/tmp');
-      process.env.MIGRATIONS_DIR = migrationsDir;
+      const applied1 = await migrate(testPool);
+      expect(applied1).toEqual(['zz_test_noop.sql']);
       
-      const applied = await migrate(testPool);
-      expect(applied).toEqual([]);
+      const applied2 = await migrate(testPool);
+      expect(applied2).toEqual([]);
     } finally {
-      process.chdir(originalCwd);
-      delete process.env.MIGRATIONS_DIR;
+      if (originalMigrationsDir !== undefined) {
+        process.env.MIGRATIONS_DIR = originalMigrationsDir;
+      } else {
+        delete process.env.MIGRATIONS_DIR;
+      }
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 });

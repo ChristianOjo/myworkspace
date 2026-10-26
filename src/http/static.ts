@@ -1,4 +1,3 @@
-// src/http/static.ts
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -67,19 +66,15 @@ async function serveFile(reply: FastifyReply, filePath: string, isAsset: boolean
 }
 
 export function registerStatic(app: FastifyInstance, dir: string): void {
-  app.setNotFoundHandler(async (request: FastifyRequest, reply: FastifyReply) => {
+  const handler = async (request: FastifyRequest, reply: FastifyReply) => {
     const url = request.url;
-    
-    if (url.startsWith('/api/') || url === '/health') {
-      return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
-    }
-    
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
-    }
     
     const queryIndex = url.indexOf('?');
     const pathname = queryIndex >= 0 ? url.slice(0, queryIndex) : url;
+    
+    if (pathname.startsWith('/api/') || pathname === '/health') {
+      return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
+    }
     
     const safePath = resolveSafePath(dir, pathname);
     if (!safePath) {
@@ -110,5 +105,17 @@ export function registerStatic(app: FastifyInstance, dir: string): void {
     }
     
     return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
+  };
+
+  app.route({
+    method: ['GET'],
+    url: '/',
+    handler
+  });
+
+  app.route({
+    method: ['GET'],
+    url: '/*',
+    handler
   });
 }

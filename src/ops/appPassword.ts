@@ -1,4 +1,3 @@
-// src/ops/appPassword.ts
 import { Pool } from 'pg';
 
 export async function setRolePassword(pool: Pool, role: string, password: string): Promise<void> {
@@ -14,7 +13,7 @@ export async function setRolePassword(pool: Pool, role: string, password: string
   const client = await pool.connect();
   try {
     const formatRes = await client.query(
-      `SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1, $2) AS stmt`,
+      `SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1::text, $2::text) AS stmt`,
       [role, password]
     );
     const stmt = formatRes.rows[0].stmt;
