@@ -1,4 +1,3 @@
-//src/auth/bootstrap.ts
 import { Pool } from 'pg';
 import { hashPassword, generatePassword, validatePassword } from './passwords.js';
 
@@ -41,6 +40,9 @@ export async function createOrgWithAdmin(
       [input.orgName, input.slug]
     );
     const orgId = orgRes.rows[0].id;
+
+    // locations and users use FORCE ROW LEVEL SECURITY, so the transaction must be scoped to the new org for the inserts to pass.
+    await client.query("SELECT set_config('app.org_id', $1, true)", [orgId]);
 
     const locRes = await client.query(
       `INSERT INTO locations (org_id, name, timezone, open_hour, close_hour) 
