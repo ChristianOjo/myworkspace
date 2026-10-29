@@ -1,4 +1,4 @@
-// src/ops/startup.ts
+//src/ops/startup.ts
 import { createPool } from '../db/pool.js';
 import { runPreflight as defaultRunPreflight } from './preflight.js';
 import { migrate as defaultMigrate } from '../db/migrate.js';
@@ -75,7 +75,8 @@ export async function runStartupTasks(
           slug: config.bootstrap.slug,
           adminEmail: config.bootstrap.adminEmail,
           adminName: config.bootstrap.adminName,
-          adminPassword: config.bootstrap.adminPassword
+          adminPassword: config.bootstrap.adminPassword,
+          timezone: config.bootstrap.timezone
         });
         log(`bootstrap: created organisation ${config.bootstrap.slug}`);
       }

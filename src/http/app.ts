@@ -1,4 +1,4 @@
-// src/http/app.ts
+//src/http/app.ts
 import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Pool } from 'pg';
 import { login } from '../auth/login.js';
@@ -96,7 +96,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.code(400).send({ error: { code: 'validation_error', message: 'Invalid request' } });
     }
 
-    request.log.error(`${error.message}\n${error.stack}`);
+    const err = error instanceof Error ? error : new Error(String(error));
+    request.log.error(`${err.message}\n${err.stack}`);
     return reply.code(500).send({ error: { code: 'internal_error', message: 'Something went wrong' } });
   });
 
@@ -456,11 +457,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
     app.post('/api/v1/bookings/:id/arrived', {
       schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false },
-      preValidation: (request, reply, done) => {
+      preValidation: async (request, reply) => {
         if (request.body !== undefined && (typeof request.body !== 'object' || request.body === null || Object.keys(request.body).length > 0)) {
           return reply.code(400).send({ error: { code: 'validation_error', message: 'Invalid request' } });
         }
-        done();
       }
     }, async (request, reply) => {
       const auth = (request as any).auth;
@@ -493,11 +493,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
     app.post('/api/v1/bookings/:id/release', {
       schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } }, additionalProperties: false },
-      preValidation: (request, reply, done) => {
+      preValidation: async (request, reply) => {
         if (request.body !== undefined && (typeof request.body !== 'object' || request.body === null || Object.keys(request.body).length > 0)) {
           return reply.code(400).send({ error: { code: 'validation_error', message: 'Invalid request' } });
         }
-        done();
       }
     }, async (request, reply) => {
       const auth = (request as any).auth;

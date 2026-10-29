@@ -1,4 +1,4 @@
-// src/booking/createBooking.ts
+//src/booking/createBooking.ts
 import { Pool } from 'pg';
 import { withOrg } from '../db/withOrg.js';
 
@@ -125,8 +125,7 @@ export async function createBooking(
   }
 
   try {
-    const result = await withOrg(pool, input.orgId, async (client) => {
-      // Lock the resource row in share mode to prevent concurrent block creation from succeeding on the same slot
+    const result: CreateBookingResult = await withOrg(pool, input.orgId, async (client) => {
       const resRes = await client.query(`
         SELECT r.id, r.status, r.hourly_rate_cents, r.day_rate_cents, l.timezone, l.open_hour, l.close_hour
         FROM resources r
@@ -277,7 +276,6 @@ export async function createBooking(
 
     return result;
   } catch (err: any) {
-    // Known limitation: a maintenance block created at the same instant as a booking is not protected by a constraint, because the two live in different tables.
     if (err.code === '23P01' || err.code === '40P01') {
       return { ok: false, http: 409, code: 'slot_conflict', reason: 'slot_taken', message: 'Slot just taken' };
     }

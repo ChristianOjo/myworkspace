@@ -1,3 +1,4 @@
+//scripts/create-org.ts
 import { createPool } from '../src/db/pool.js';
 import { createOrgWithAdmin } from '../src/auth/bootstrap.js';
 
@@ -13,8 +14,8 @@ async function main() {
   const slug = getArg('--slug');
   const adminEmail = getArg('--admin-email');
   const adminName = getArg('--admin-name');
-  const locationName = getArg('--location-name') || 'Main';
-  const timezone = getArg('--timezone') || 'UTC';
+  const locationName = getArg('--location-name') || undefined;
+  const timezone = getArg('--timezone') || undefined;
 
   if (!orgName || !slug || !adminEmail || !adminName) {
     console.error('Usage: --org-name <name> --slug <slug> --admin-email <email> --admin-name <name> [--location-name <name>] [--timezone <tz>]');
@@ -33,7 +34,7 @@ async function main() {
     });
 
     console.log(`Organization ID: ${result.orgId}`);
-    console.log(`Slug: ${result.slug}`);
+    console.log(`Slug: ${slug}`);
     console.log(`Admin Email: ${adminEmail}`);
     console.log(`Generated Password: ${result.password}`);
     console.log("Save this password now. It will not be shown again.");
