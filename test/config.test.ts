@@ -72,4 +72,76 @@ describe('config', () => {
     
     expect(redactUrl('postgres://u:secret@h/db')).toBe('postgres://u:***@h/db');
   });
+
+  it('builds the app database url from parts', () => {
+    const config = loadConfig({
+      APP_DB_HOST: 'db.internal',
+      APP_DB_PORT: '5432',
+      APP_DB_NAME: 'mw',
+      APP_USER_PASSWORD: 'p+a/s=s w'
+    });
+    expect(config.appDatabaseUrl).toBe('postgres://app_user:p%2Ba%2Fs%3Ds%20w@db.internal:5432/mw');
+  });
+
+  it('an explicit app database url wins over the parts', () => {
+    const config = loadConfig({
+      APP_DATABASE_URL: 'postgres://explicit:pass@host/db',
+      APP_DB_HOST: 'db.internal',
+      APP_DB_PORT: '5432',
+      APP_DB_NAME: 'mw',
+      APP_USER_PASSWORD: 'p+a/s=s w'
+    });
+    expect(config.appDatabaseUrl).toBe('postgres://explicit:pass@host/db');
+  });
+
+  it('production rejects when neither the url nor the parts are given, without leaking a password', () => {
+    const err = (() => {
+      try {
+        loadConfig({ NODE_ENV: 'production', DATABASE_URL: 'postgres://owner:secret@host/db' });
+      } catch (e: any) {
+        return e;
+      }
+    })();
+    expect(err.message).toContain('APP_DATABASE_URL is missing');
+    expect(err.message).not.toContain('secret');
+  });
+
+  it('migrate on start and bootstrap settings are parsed', () => {
+    const config1 = loadConfig({ RUN_MIGRATIONS_ON_START: 'true' });
+    expect(config1.migrateOnStart).toBe(true);
+    
+    const config2 = loadConfig({
+      BOOTSTRAP_ORG_NAME: 'Test Org',
+      BOOTSTRAP_ORG_SLUG: 'test-org',
+      BOOTSTRAP_ADMIN_EMAIL: 'admin@test.com',
+      BOOTSTRAP_ADMIN_NAME: 'Admin',
+      BOOTSTRAP_ADMIN_PASSWORD: 'password123456'
+    });
+    expect(config2.bootstrap).toEqual({
+      orgName: 'Test Org',
+      slug: 'test-org',
+      adminEmail: 'admin@test.com',
+      adminName: 'Admin',
+      adminPassword: 'password123456',
+      timezone: 'UTC'
+    });
+  });
+
+  it('partial bootstrap settings list every missing name and never print the password', () => {
+    const password = 'supersecretpassword123';
+    const err = (() => {
+      try {
+        loadConfig({
+          BOOTSTRAP_ORG_SLUG: 'test',
+          BOOTSTRAP_ADMIN_PASSWORD: password
+        });
+      } catch (e: any) {
+        return e;
+      }
+    })();
+    expect(err.message).toContain('BOOTSTRAP_ORG_NAME');
+    expect(err.message).toContain('BOOTSTRAP_ADMIN_EMAIL');
+    expect(err.message).toContain('BOOTSTRAP_ADMIN_NAME');
+    expect(err.message).not.toContain(password);
+  });
 });

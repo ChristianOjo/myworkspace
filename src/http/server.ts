@@ -4,10 +4,18 @@ import { buildApp } from './app.js';
 import { runSweepers } from '../jobs/sweepers.js';
 import { createScheduler } from '../jobs/scheduler.js';
 import { loadConfig } from '../config.js';
+import { runStartupTasks } from '../ops/startup.js';
 
 let config;
 try {
   config = loadConfig();
+} catch (err: any) {
+  console.error(err.message);
+  process.exit(1);
+}
+
+try {
+  await runStartupTasks(config, console.log);
 } catch (err: any) {
   console.error(err.message);
   process.exit(1);

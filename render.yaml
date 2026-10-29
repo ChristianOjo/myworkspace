@@ -1,0 +1,50 @@
+databases:
+  - name: myworkspace-db
+    plan: free
+    postgresMajorVersion: "18"
+    region: frankfurt
+
+services:
+  - type: web
+    name: myworkspace
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: myworkspace-db
+          property: connectionString
+      - key: APP_DB_HOST
+        fromDatabase:
+          name: myworkspace-db
+          property: host
+      - key: APP_DB_PORT
+        fromDatabase:
+          name: myworkspace-db
+          property: port
+      - key: APP_DB_NAME
+        fromDatabase:
+          name: myworkspace-db
+          property: database
+      - key: APP_USER_PASSWORD
+        generateValue: true
+      - key: DB_SSL
+        value: "off"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      - key: BOOTSTRAP_ORG_NAME
+        sync: false
+      - key: BOOTSTRAP_ORG_SLUG
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_NAME
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_TIMEZONE
+        sync: false

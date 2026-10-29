@@ -14,6 +14,15 @@ export interface Config {
   staticDir?: string;
   schedulerEnabled: boolean;
   appUserPassword?: string;
+  migrateOnStart: boolean;
+  bootstrap?: {
+    orgName: string;
+    slug: string;
+    adminEmail: string;
+    adminName: string;
+    adminPassword: string;
+    timezone: string;
+  };
 }
 
 export function redactUrl(url: string): string {
@@ -25,7 +34,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const isProduction = nodeEnv === 'production';
 
   const databaseUrl = env.DATABASE_URL || '';
-  const appDatabaseUrl = env.APP_DATABASE_URL || '';
+  
+  let appDatabaseUrl = env.APP_DATABASE_URL || '';
+  if (!appDatabaseUrl && env.APP_DB_HOST && env.APP_DB_NAME && env.APP_USER_PASSWORD) {
+    const port = env.APP_DB_PORT || '5432';
+    const encodedPassword = encodeURIComponent(env.APP_USER_PASSWORD);
+    appDatabaseUrl = `postgres://app_user:${encodedPassword}@${env.APP_DB_HOST}:${port}/${env.APP_DB_NAME}`;
+  }
+  
   const portStr = env.PORT || (isProduction ? '3000' : '3000');
   const host = env.HOST || (isProduction ? '0.0.0.0' : '127.0.0.1');
   const dbSslEnv = env.DB_SSL || (isProduction ? 'require' : 'off');
@@ -35,6 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const staticDir = env.STATIC_DIR || undefined;
   const schedulerEnabled = env.SCHEDULER !== 'off';
   const appUserPassword = env.APP_USER_PASSWORD || undefined;
+  const migrateOnStart = env.RUN_MIGRATIONS_ON_START === 'true';
 
   const dbSsl: 'off' | 'require' | 'no-verify' = 
     dbSslEnv === 'require' || dbSslEnv === 'no-verify' ? dbSslEnv : 'off';
@@ -45,6 +62,37 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   const port = Number(portStr);
   const dbPoolMax = Number(dbPoolMaxStr);
+
+  let bootstrap: Config['bootstrap'] | undefined;
+  const bootstrapVars = [
+    'BOOTSTRAP_ORG_NAME',
+    'BOOTSTRAP_ORG_SLUG', 
+    'BOOTSTRAP_ADMIN_EMAIL',
+    'BOOTSTRAP_ADMIN_NAME',
+    'BOOTSTRAP_ADMIN_PASSWORD'
+  ];
+  const hasAnyBootstrap = bootstrapVars.some(v => env[v]);
+  
+  if (hasAnyBootstrap) {
+    const missing = bootstrapVars.filter(v => !env[v]);
+    if (missing.length > 0) {
+      throw new Error(`Missing bootstrap variables: ${missing.join(', ')}`);
+    }
+    
+    const adminPassword = env.BOOTSTRAP_ADMIN_PASSWORD!;
+    if (adminPassword.length < 10 || adminPassword.length > 200) {
+      throw new Error('BOOTSTRAP_ADMIN_PASSWORD must be between 10 and 200 characters');
+    }
+    
+    bootstrap = {
+      orgName: env.BOOTSTRAP_ORG_NAME!,
+      slug: env.BOOTSTRAP_ORG_SLUG!,
+      adminEmail: env.BOOTSTRAP_ADMIN_EMAIL!,
+      adminName: env.BOOTSTRAP_ADMIN_NAME!,
+      adminPassword,
+      timezone: env.BOOTSTRAP_TIMEZONE || 'UTC'
+    };
+  }
 
   if (isProduction) {
     const problems: string[] = [];
@@ -84,13 +132,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
 
     if (problems.length > 0) {
-      const redactedProblems = problems.map(p => {
-        if (p.includes('DATABASE_URL') || p.includes('APP_DATABASE_URL')) {
-          return p;
-        }
-        return p;
-      });
-      throw new Error(`Production configuration errors:\n${redactedProblems.join('\n')}`);
+      throw new Error(`Production configuration errors:\n${problems.join('\n')}`);
     }
   }
 
@@ -106,6 +148,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy,
     staticDir,
     schedulerEnabled,
-    appUserPassword
+    appUserPassword,
+    migrateOnStart,
+    bootstrap
   };
 }
