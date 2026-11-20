@@ -13,6 +13,7 @@ export interface CreateBookingInput {
   customerName?: string;
   customerPhone?: string;
   arrivedNow?: boolean;
+  auditAction?: string;
 }
 
 export interface Booking {
@@ -241,16 +242,17 @@ export async function createBooking(
       const row = insertRes.rows[0];
 
       await client.query(
-        `INSERT INTO audit_log (org_id, actor_id, action, entity, entity_id, diff) 
-         VALUES ($1, $2, 'booking.create', 'booking', $3, $4)`,
-        [input.orgId, input.userId, row.id, JSON.stringify({ 
-          resourceId: row.resource_id, 
-          start: new Date(row.start).toISOString(), 
-          end: new Date(row.end).toISOString(), 
-          priceCents: row.price_cents, 
-          pricing: row.pricing_type, 
+        `INSERT INTO audit_log (org_id, actor_id, action, entity, entity_id, diff)
+         VALUES ($1, $2, $3, 'booking', $4, $5)`,
+        [input.orgId, input.userId, input.auditAction || 'booking.create', row.id, JSON.stringify({
+          resourceId: row.resource_id,
+          start: new Date(row.start).toISOString(),
+          end: new Date(row.end).toISOString(),
+          priceCents: row.price_cents,
+          pricing: row.pricing_type,
           customerName: row.customer_name,
-          arrivedNow: !!input.arrivedNow 
+          arrivedNow: !!input.arrivedNow,
+          source: input.auditAction === 'customer_booking.create' ? 'customer_portal' : 'front_desk'
         })]
       );
 

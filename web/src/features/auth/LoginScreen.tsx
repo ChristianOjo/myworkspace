@@ -55,7 +55,7 @@ export function LoginScreen({ onLogin }: { onLogin: (orgSlug: string, email: str
             {busy ? 'Checking credentials…' : 'Sign in'} <span aria-hidden="true">↗</span>
           </button>
         </form>
-        <p className="login-footnote">Sign-in and workspace data are handled by your organisation’s front desk API.</p>
+        <p className="login-footnote">Sign-in and workspace data are handled by your organisation’s front desk API. Booking a space as a customer? <a href="/portal">Use the customer portal</a>.</p>
       </section>
     </div>
     <footer className="login-footer"><span>MYWORKSPACE / FRONT DESK</span><span>STAFF OPERATIONS</span><span>v1.0</span></footer>

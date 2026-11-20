@@ -1,0 +1,69 @@
+/* Customer portal additions on top of the shared design system (global.css). */
+
+.portal-heading h1 { margin: 8px 0 0; font-size: clamp(28px, 4vw, 40px); letter-spacing: -.03em; }
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.portal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.portal-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.resource-label-mini { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.portal-card h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+
+.portal-rates { display: flex; flex-wrap: wrap; gap: 22px; padding: 12px 0; border-top: 1px solid var(--line-light); border-bottom: 1px solid var(--line-light); }
+.portal-rates > div { display: grid; gap: 2px; }
+.portal-rates span { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.portal-rates b { font-family: "SFMono-Regular", Consolas, monospace; font-size: 16px; font-weight: 650; }
+.portal-rates small { color: var(--muted); font-size: 9px; }
+
+.portal-card-actions { margin-top: auto; }
+.portal-card-actions .button { justify-content: space-between; width: 100%; }
+
+.read-only-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  background: #f1f0ea;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* My bookings list */
+.portal-list { display: grid; gap: 12px; margin-top: 20px; }
+.portal-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+  gap: 18px;
+  align-items: start;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.portal-list-row.is-cancelled { opacity: .62; }
+.portal-list-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.portal-list-title b { font-size: 14px; }
+.portal-list-time { margin: 7px 0 0; color: var(--ink); font-size: 12px; }
+.portal-list-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; text-align: right; }
+.portal-list-price { display: grid; gap: 2px; }
+.portal-list-price small { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.portal-list-price b { font-family: "SFMono-Regular", Consolas, monospace; font-size: 16px; }
+.portal-list-note { font-size: 10px; }
+.profile-popover-phone { margin: 4px 0 10px; font-size: 11px; }
+
+@media (max-width: 740px) {
+  .portal-list-row { grid-template-columns: 1fr; }
+  .portal-list-side { align-items: flex-start; text-align: left; }
+}

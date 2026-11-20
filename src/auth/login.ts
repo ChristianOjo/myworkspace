@@ -14,10 +14,10 @@ async function getDummyHash(): Promise<string> {
 }
 
 export async function login(
-  pool: Pool, 
-  input: { orgSlug: string; email: string; password: string }, 
+  pool: Pool,
+  input: { orgSlug: string; email: string; password: string },
   deps?: { now?: () => Date; verifyPassword?: typeof verifyPassword }
-): Promise<{ ok: true; token: string; expiresAt: string; user: { id: string; email: string; fullName: string; role: string } } | Failure> {
+): Promise<{ ok: true; token: string; expiresAt: string; user: { id: string; email: string; fullName: string; role: string; phone: string | null } } | Failure> {
   const slug = input.orgSlug.trim().toLowerCase();
   const email = input.email.trim();
   const now = deps?.now ? deps.now() : new Date();
@@ -25,11 +25,11 @@ export async function login(
 
   const orgId = await resolveOrgId(pool, slug);
   
-  let user: { id: string; email: string; full_name: string; role: string; password_hash: string | null; deactivated_at: Date | null } | null = null;
+  let user: { id: string; email: string; full_name: string; role: string; phone: string | null; password_hash: string | null; deactivated_at: Date | null } | null = null;
   if (orgId) {
     user = await withOrg(pool, orgId, async (client) => {
       const res = await client.query(
-        `SELECT id, email, full_name, role, password_hash, deactivated_at FROM users WHERE email = $1`,
+        `SELECT id, email, full_name, role, password_hash, phone, deactivated_at FROM users WHERE email = $1`,
         [email]
       );
       return res.rows.length > 0 ? res.rows[0] : null;
@@ -53,7 +53,8 @@ export async function login(
       id: user.id,
       email: user.email,
       fullName: user.full_name,
-      role: user.role
+      role: user.role,
+      phone: user.phone ?? null
     }
   };
 }

@@ -10,6 +10,7 @@ export interface AuthResult {
   email: string;
   fullName: string;
   role: string;
+  phone: string | null;
   sessionId: string;
   expiresAt: string;
 }
@@ -59,7 +60,7 @@ export async function authenticate(
   try {
     const result = await withOrg(pool, orgId, async (client) => {
       const sessionRes = await client.query(
-        `SELECT s.id, s.user_id, s.expires_at, s.last_seen_at, u.email, u.full_name, u.role, u.deactivated_at
+        `SELECT s.id, s.user_id, s.expires_at, s.last_seen_at, u.email, u.full_name, u.role, u.phone, u.deactivated_at
          FROM sessions s JOIN users u ON s.user_id = u.id
          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2 AND u.deactivated_at IS NULL`,
         [tokenHash, now.toISOString()]
@@ -85,6 +86,7 @@ export async function authenticate(
         email: row.email,
         fullName: row.full_name,
         role: row.role,
+        phone: row.phone,
         sessionId: row.id,
         expiresAt: new Date(row.expires_at).toISOString()
       };

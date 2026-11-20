@@ -93,7 +93,19 @@ export function registerStatic(app: FastifyInstance, dir: string): void {
     
     const lastSegment = pathname.split('/').pop() || '';
     const hasDot = lastSegment.includes('.');
-    
+
+    // Customer portal SPA at /portal and /portal/<route> (client-side routes).
+    const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
+    if (isPortalRoute && !hasDot) {
+      const portalPath = path.join(dir, 'portal.html');
+      try {
+        await fs.promises.stat(portalPath);
+        return serveFile(reply, portalPath, false);
+      } catch {
+        return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
+      }
+    }
+
     if (!hasDot) {
       const indexPath = path.join(dir, 'index.html');
       try {
@@ -103,7 +115,7 @@ export function registerStatic(app: FastifyInstance, dir: string): void {
         return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
       }
     }
-    
+
     return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
   };
 

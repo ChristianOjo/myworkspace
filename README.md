@@ -13,8 +13,9 @@ Backend is Fastify + PostgreSQL (TypeScript). The staff web client is React + Vi
 - **Cash handling:** payments and refunds are recorded per booking, with a daily cash report per location.
 - **Maintenance blocks** take a resource out of service for a time range, also overlap-protected.
 - **Multi-tenancy via Row Level Security.** Every org's data is isolated at the database level. The server connects as a restricted `app_user` role, never as the owner.
-- **Roles:** `org_admin`, `location_manager`, `member`.
-- **Audit log** for staff, booking and payment actions.
+- **Roles:** `org_admin`, `location_manager`, `member` (staff) and `customer` (self-service portal).
+- **Customer self-service portal.** Visitors browse the public catalogue (locations, active spaces, live availability), register an account, book hourly or whole-day slots, view their own bookings and cancel unpaid upcoming reservations. The staff front desk and the customer portal are separate UIs on separate routes and are enforced separately by role.
+- **Audit log** for staff, customer and payment actions.
 - **Background sweepers** (every 60 s): confirmed bookings that were never checked in become `no_show` (15-minute grace on hourly bookings; day bookings after the day ends), and checked-in bookings whose period has ended become `completed`.
 - **Hardening:** login rate limiting (5 attempts/account and 30/IP per 15 min), security headers, strict CORS, production config validation that refuses to boot with dev credentials.
 
@@ -112,6 +113,7 @@ All configuration is via environment variables. See `.env.example` and `web/.env
 | `RUN_MIGRATIONS_ON_START` | `false` | Run preflight and migrations at boot |
 | `BOOTSTRAP_*` | none | `ORG_NAME`, `ORG_SLUG`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD` (10–200 chars), optional `TIMEZONE` (default `UTC`). Creates the org on first boot; skipped if the slug already exists. All five required if any is set |
 | `VITE_API_BASE_URL` | `http://127.0.0.1:3000` | Web client only; set empty when the API serves the UI |
+| `VITE_DEFAULT_ORG_SLUG` | empty | Customer portal only; pre-fills the organisation slug on sign-in/register |
 
 In production, `APP_DATABASE_URL` can be omitted if `APP_DB_HOST`, `APP_DB_NAME`, `APP_DB_PORT` and `APP_USER_PASSWORD` are set. The URL is built for you.
 
@@ -159,28 +161,38 @@ src/
   jobs/        scheduler and sweepers
   ops/         startup tasks, preflight, app_user password
   db/          pool, per-org transactions (withOrg), migration runner
-migrations/    001–007 SQL (schema, RLS, blocks, pricing/payments, audit, sessions, system functions)
+migrations/    001–008 SQL (schema, RLS, blocks, pricing/payments, audit, sessions, system functions, customer portal)
 scripts/       create-org, preflight, migrate-prod
 test/          API tests
-web/           React front-desk client
+web/           React clients: `src/` staff front desk (`index.html`) and `src/portal/` customer portal (`portal.html`, served at `/portal`)
 ```
 
 ## API
 
-All routes are under `/api/v1` and, except login, require an authenticated session.
+All routes are under `/api/v1`. The public catalogue and registration are unauthenticated; staff routes require a staff session (`org_admin`, `location_manager` or `member`); the `/me/*` routes require a `customer` session. Shared account actions (`/auth/me`, `/auth/logout`, `/auth/password`) work for both.
 
 | Area | Endpoints |
 |---|---|
 | Health | `GET /health` |
-| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password` |
+| Public catalogue | `GET /public/:slug/org`, `GET /public/:slug/locations`, `GET /public/:slug/resources`, `GET /public/:slug/availability` |
+| Auth | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password` |
+| Customer bookings | `GET /me/bookings`, `GET /me/bookings/:id`, `POST /me/bookings`, `POST /me/bookings/:id/cancel` |
 | Staff | `GET /staff`, `POST /staff`, `POST /staff/:id/deactivate`, `POST /staff/:id/password` |
 | Locations | `GET /locations`, `POST /locations`, `PATCH /locations/:id` |
 | Resources | `GET /resources`, `POST /resources`, `PATCH /resources/:id` |
-| Bookings | `GET /bookings`, `GET /bookings/:id`, `POST /bookings`, `POST /bookings/:id/arrived`, `/cancel`, `/release` |
+| Bookings (desk) | `GET /bookings`, `GET /bookings/:id`, `POST /bookings`, `POST /bookings/:id/arrived`, `/cancel`, `/release` |
 | Payments | `POST /bookings/:id/payments`, `POST /bookings/:id/refunds` |
 | Cash | `GET /cash/daily` |
 | Blocks | `GET /resources/:id/blocks`, `POST /resources/:id/blocks`, `DELETE /blocks/:id` |
 
+### Customer portal notes
+
+- The customer UI is served from `/portal`; the staff front desk remains at `/`.
+- A customer account is created through `POST /auth/register` with the org slug, name, email, password and optional phone. Staff accounts are still created by an admin.
+- `POST /me/bookings` creates a booking owned by the caller; the walk-in name on the booking comes from the profile. Customers cannot check themselves in or record payments.
+- Customers can cancel only their own `confirmed`, unpaid, upcoming bookings; paid and already-started bookings are handled by the front desk.
+- There is no online payment gateway in this build: reservations are confirmed and settled in cash at the desk, matching the existing cash flow.
+
 ## Status
 
-The API and the staff web client are working. There is no member-facing self-service booking UI yet; the web app is for front-desk and management staff only. The currency symbol is a per-browser setting until the API exposes a shared one.
+The API, the staff front-desk client (`/`) and the customer self-service portal (`/portal`) are working. Customers browse availability, register, book hourly or whole-day slots, and manage their own reservations; staff keep the desk, cash and setup workflows. The currency symbol remains a per-browser setting until the API exposes a shared one.
