@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { resolve } from 'node:path';
 
 // Two single-page applications share one build:
 //   index.html  -> staff front-desk app (/ and /staff routes)
 //   portal.html -> customer self-service portal (/portal client routes)
+// Relative entries resolve against the Vite root (this directory); keep this
+// file free of Node built-ins so `tsc --noEmit` passes without @types/node.
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -14,8 +15,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        portal: resolve(__dirname, 'portal.html'),
+        main: 'index.html',
+        portal: 'portal.html',
       },
     },
   },
