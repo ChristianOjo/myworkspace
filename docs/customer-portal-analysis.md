@@ -53,7 +53,7 @@ Production data observed on `https://myworkspace-8lls.onrender.com` (org slug `m
 - Customer cancel re-checks ownership, status, start time and net paid inside a locked transaction before delegating to the shared cancellation logic (no refunds for self-cancel).
 
 ### Data and API
-- Migration `008_customer_portal.sql`: adds the `customer` role and `users.phone`; no new tables (existing RLS grants already cover the reads/writes).
+- Migration `008_customer_portal.sql`: adds the `customer` role and `users.phone`; `009_customer_company.sql` adds the optional visitor `users.company` (employer name, distinct from the tenant org); no new tables (existing RLS grants already cover the reads/writes).
 - Public API: `GET /public/default-org` (the only active organisation; 404 `unknown_org` when none, `multiple_orgs` when several), `GET /public/:slug/org`, `/locations`, `/resources`, `/availability`.
 - Customer API: `POST /auth/register`, `GET/POST /me/bookings`, `GET /me/bookings/:id`, `POST /me/bookings/:id/cancel`.
 - New audit action `customer_booking.create`; registration writes `customer.register`; cancellations keep `booking.cancel`.

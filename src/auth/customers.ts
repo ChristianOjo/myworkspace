@@ -14,6 +14,7 @@ export interface CustomerProfile {
   fullName: string;
   role: 'customer';
   phone: string | null;
+  company: string | null;
 }
 
 export type RegisterResult =
@@ -31,7 +32,7 @@ function isValidEmail(email: string): boolean {
 
 export async function registerCustomer(
   pool: Pool,
-  input: { orgSlug: string; fullName: string; email: string; password: string; phone?: string },
+  input: { orgSlug: string; fullName: string; email: string; password: string; phone?: string; company?: string },
   opts?: { now?: Date }
 ): Promise<RegisterResult> {
   const slug = (input.orgSlug || '').trim().toLowerCase();
@@ -62,6 +63,14 @@ export async function registerCustomer(
     }
   }
 
+  let company: string | null = null;
+  if (input.company !== undefined && input.company !== null && String(input.company).trim() !== '') {
+    company = String(input.company).trim();
+    if (company.length > 200) {
+      return fail(400, 'validation_error', 'Invalid company name', 'invalid_company');
+    }
+  }
+
   const orgId = await resolveOrgId(pool, slug);
   if (!orgId) {
     return fail(404, 'not_found', 'Organisation not found', 'unknown_org');
@@ -78,20 +87,20 @@ export async function registerCustomer(
     const hashedPw = await hashPassword(input.password);
 
     const res = await client.query(
-      `INSERT INTO users (org_id, email, full_name, role, password_hash, phone)
-       VALUES ($1, $2, $3, 'customer', $4, $5)
-       RETURNING id, email, full_name, phone`,
-      [orgId, email, fullName, hashedPw, phone]
+      `INSERT INTO users (org_id, email, full_name, role, password_hash, phone, company)
+       VALUES ($1, $2, $3, 'customer', $4, $5, $6)
+       RETURNING id, email, full_name, phone, company`,
+      [orgId, email, fullName, hashedPw, phone, company]
     );
     const row = res.rows[0];
 
     await client.query(
       `INSERT INTO audit_log (org_id, actor_id, action, entity, entity_id, diff)
        VALUES ($1, $2, 'customer.register', 'user', $3, $4)`,
-      [orgId, row.id, row.id, JSON.stringify({ email, phone })]
+      [orgId, row.id, row.id, JSON.stringify({ email, phone, company })]
     );
 
-    return { id: row.id, email: row.email, fullName: row.full_name, phone: row.phone } as const;
+    return { id: row.id, email: row.email, fullName: row.full_name, phone: row.phone, company: row.company } as const;
   });
 
   if (!('id' in created)) return created;
@@ -109,7 +118,8 @@ export async function registerCustomer(
       email: created.email,
       fullName: created.fullName,
       role: 'customer',
-      phone: created.phone
+      phone: created.phone,
+      company: created.company
     }
   };
 }

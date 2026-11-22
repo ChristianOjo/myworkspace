@@ -198,7 +198,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
           fullName: { type: 'string', maxLength: 200 },
           email: { type: 'string', maxLength: 255 },
           password: { type: 'string', maxLength: 255 },
-          phone: { type: 'string', maxLength: 50 }
+          phone: { type: 'string', maxLength: 50 },
+          company: { type: 'string', maxLength: 200 }
         },
         required: ['orgSlug', 'fullName', 'email', 'password'],
         additionalProperties: false
@@ -304,7 +305,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     app.get('/api/v1/auth/me', async (request, reply) => {
       const auth = (request as any).auth;
       return {
-        user: { id: auth.userId, email: auth.email, fullName: auth.fullName, role: auth.role, phone: auth.phone },
+        user: { id: auth.userId, email: auth.email, fullName: auth.fullName, role: auth.role, phone: auth.phone, company: auth.company },
         session: { expiresAt: auth.expiresAt }
       };
     });

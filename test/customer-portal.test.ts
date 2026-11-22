@@ -37,7 +37,7 @@ interface RegisteredCustomer {
   fullName: string;
 }
 
-async function registerCustomer(slug: string, overrides: Partial<{ email: string; fullName: string; password: string; phone: string }> = {}) {
+async function registerCustomer(slug: string, overrides: Partial<{ email: string; fullName: string; password: string; phone: string; company: string }> = {}) {
   const email = overrides.email ?? `customer-${Math.random().toString(36).slice(2)}@example.com`;
   const payload = {
     orgSlug: slug,
@@ -45,6 +45,7 @@ async function registerCustomer(slug: string, overrides: Partial<{ email: string
     email,
     password: overrides.password ?? 'customer-password-1',
     ...(overrides.phone ? { phone: overrides.phone } : {}),
+    ...(overrides.company ? { company: overrides.company } : {}),
   };
   const res = await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload });
   return { res, email };
@@ -111,22 +112,43 @@ describe('default public organisation (portal slug auto-resolve)', () => {
 });
 
 describe('customer registration', () => {
-  it('creates a customer account and returns a session token', async () => {
+  it('creates a customer account with profile fields and returns a session token', async () => {
     await createOrgWithAdmin(testPool, { orgName: 'Cafe Works', slug: 'cafe-works', adminEmail: 'a@a.a', adminName: 'A' });
-    const { res } = await registerCustomer('cafe-works', { fullName: 'Casey Customer', phone: '+268 7600 1234' });
+    const { res } = await registerCustomer('cafe-works', {
+      fullName: 'Casey Customer',
+      phone: '+268 7600 1234',
+      company: 'Acme Trading (Pty) Ltd',
+    });
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.token).toBeDefined();
     expect(body.user.role).toBe('customer');
     expect(body.user.fullName).toBe('Casey Customer');
     expect(body.user.phone).toBe('+268 7600 1234');
+    expect(body.user.company).toBe('Acme Trading (Pty) Ltd');
 
-    const dbRows = await testPool.query(`SELECT role, phone FROM users WHERE id = $1`, [body.user.id]);
+    const dbRows = await testPool.query(`SELECT role, phone, company FROM users WHERE id = $1`, [body.user.id]);
     expect(dbRows.rows[0].role).toBe('customer');
+    expect(dbRows.rows[0].company).toBe('Acme Trading (Pty) Ltd');
 
     const meRes = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { Authorization: `Bearer ${body.token}` } });
     expect(meRes.statusCode).toBe(200);
     expect(meRes.json().user.role).toBe('customer');
+    expect(meRes.json().user.company).toBe('Acme Trading (Pty) Ltd');
+  });
+
+  it('stores no company when omitted and rejects an overlong company name', async () => {
+    await createOrgWithAdmin(testPool, { orgName: 'Cafe Works', slug: 'cafe-works', adminEmail: 'a@a.a', adminName: 'A' });
+
+    const omitted = await registerCustomer('cafe-works');
+    expect(omitted.res.statusCode).toBe(201);
+    expect(omitted.res.json().user.company).toBeNull();
+    const omittedRow = await testPool.query(`SELECT company FROM users WHERE id = $1`, [omitted.res.json().user.id]);
+    expect(omittedRow.rows[0].company).toBeNull();
+
+    const tooLong = await registerCustomer('cafe-works', { company: 'x'.repeat(201) });
+    expect(tooLong.res.statusCode).toBe(400);
+    expect(tooLong.res.json().error.reason).toBe('invalid_company');
   });
 
   it('rejects duplicate email, weak password and unknown org', async () => {

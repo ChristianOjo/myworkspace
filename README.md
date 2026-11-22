@@ -188,7 +188,7 @@ All routes are under `/api/v1`. The public catalogue and registration are unauth
 ### Customer portal notes
 
 - The customer UI is served from `/portal`; the staff front desk remains at `/`.
-- A customer account is created through `POST /auth/register` with the org slug, name, email, password and optional phone. The slug still goes to the API because every account belongs to a workspace (tenant isolation), but the portal resolves it automatically on single-workspace deployments via `GET /public/default-org` so visitors never type it; the slug input remains as a fallback for multi-workspace installs. Staff accounts are still created by an admin.
+- A customer account is created through `POST /auth/register` with the org slug, name, email, password, optional phone and optional company/employer name (the visitor's own organization for visits/invoices; distinct from the tenant workspace). The slug still goes to the API because every account belongs to a workspace (tenant isolation), but the portal resolves it automatically on single-workspace deployments via `GET /public/default-org` so visitors never type it; the slug input remains as a fallback for multi-workspace installs. Staff accounts are still created by an admin.
 - `POST /me/bookings` creates a booking owned by the caller; the walk-in name on the booking comes from the profile. Customers cannot check themselves in or record payments.
 - Customers can cancel only their own `confirmed`, unpaid, upcoming bookings; paid and already-started bookings are handled by the front desk.
 - There is no online payment gateway in this build: reservations are confirmed and settled in cash at the desk, matching the existing cash flow.

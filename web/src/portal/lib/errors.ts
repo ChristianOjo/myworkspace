@@ -5,6 +5,7 @@ const reasonMessages: Record<string, string> = {
   invalid_email: 'Enter a valid email address.',
   invalid_name: 'Enter your full name.',
   invalid_phone: 'Enter a valid contact number.',
+  invalid_company: 'Enter a valid company name (at most 200 characters).',
   invalid_org_slug: 'Enter the organisation slug provided by your workspace.',
   unknown_org: 'We could not find that organisation. Check the slug and try again.',
   unknown_org_login: 'We could not find that organisation. Check the slug and try again.',

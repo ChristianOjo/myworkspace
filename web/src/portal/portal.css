@@ -61,6 +61,7 @@
 .portal-list-price small { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .portal-list-price b { font-family: "SFMono-Regular", Consolas, monospace; font-size: 16px; }
 .portal-list-note { font-size: 10px; }
+.profile-popover-company { margin: 2px 0 0; font-size: 11px; }
 .profile-popover-phone { margin: 4px 0 10px; font-size: 11px; }
 
 @media (max-width: 740px) {
