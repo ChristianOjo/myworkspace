@@ -15,7 +15,7 @@ import { markArrived, cancelBooking, releaseBooking } from '../booking/actions.j
 import { recordPayment, recordRefund } from '../cash/payments.js';
 import { dailyCashReport } from '../cash/report.js';
 import { createLocation, updateLocation, createResource, updateResource, listBlocks, createBlock, deleteBlock } from '../catalog/catalog.js';
-import { publicOrg, publicLocations, publicResources, publicAvailability } from '../catalog/publicCatalog.js';
+import { defaultPublicOrg, publicOrg, publicLocations, publicResources, publicAvailability } from '../catalog/publicCatalog.js';
 import { registerStatic } from './static.js';
 
 interface AppDeps {
@@ -227,6 +227,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const publicSlugSchema = {
     params: { type: 'object', properties: { slug: { type: 'string', pattern: '^[a-z0-9-]{2,60}$' } }, required: ['slug'], additionalProperties: false }
   };
+
+  // Single-workspace convenience: lets the customer portal resolve the
+  // organisation without asking the visitor for a slug.
+  app.get('/api/v1/public/default-org', async (request, reply) => {
+    const result = await defaultPublicOrg(deps.pool);
+    if (!result.ok) return sendFailure(reply, result);
+    return { org: result.org };
+  });
 
   app.get('/api/v1/public/:slug/org', { schema: publicSlugSchema }, async (request, reply) => {
     const result = await publicOrg(deps.pool, (request.params as any).slug);

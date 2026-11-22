@@ -1,6 +1,10 @@
 # Stage 1: Build web app
 FROM node:24-slim AS web
 WORKDIR /web
+# Optional: pin the customer portal's workspace slug at build time. Leave
+# empty to let the portal resolve the single deployed organisation itself.
+ARG VITE_DEFAULT_ORG_SLUG=
+ENV VITE_DEFAULT_ORG_SLUG=${VITE_DEFAULT_ORG_SLUG}
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ ./

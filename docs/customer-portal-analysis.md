@@ -54,14 +54,14 @@ Production data observed on `https://myworkspace-8lls.onrender.com` (org slug `m
 
 ### Data and API
 - Migration `008_customer_portal.sql`: adds the `customer` role and `users.phone`; no new tables (existing RLS grants already cover the reads/writes).
-- Public API: `GET /public/:slug/org`, `/locations`, `/resources`, `/availability`.
+- Public API: `GET /public/default-org` (the only active organisation; 404 `unknown_org` when none, `multiple_orgs` when several), `GET /public/:slug/org`, `/locations`, `/resources`, `/availability`.
 - Customer API: `POST /auth/register`, `GET/POST /me/bookings`, `GET /me/bookings/:id`, `POST /me/bookings/:id/cancel`.
 - New audit action `customer_booking.create`; registration writes `customer.register`; cancellations keep `booking.cancel`.
 
 ### Frontend
 - Vite multi-entry build emits `index.html` (staff) and `portal.html` (customer); `static.ts` maps `/portal` and `/portal/*` to `portal.html`, while every other client route falls back to the staff app.
 - The portal reuses the shared design system (`global.css`), drawer, feedback and money/date helpers, with portal-only styles in `web/src/portal/portal.css`.
-- `VITE_DEFAULT_ORG_SLUG` optionally pre-fills the organisation slug on the portal form.
+- The customer never has to know the organisation slug: the portal calls `/public/default-org` and hides the slug field for the single deployed workspace; `VITE_DEFAULT_ORG_SLUG` can pin it at build time instead. Manual slug entry remains as the fallback for multi-workspace deployments or when the lookup fails. The register/login API still sends `orgSlug` because accounts are tenant-scoped (`users.org_id NOT NULL`, RLS).
 
 ## 4. Verification performed
 

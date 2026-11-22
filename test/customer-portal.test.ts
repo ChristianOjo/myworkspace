@@ -87,6 +87,29 @@ describe('customer-portal public catalogue', () => {
   });
 });
 
+describe('default public organisation (portal slug auto-resolve)', () => {
+  it('returns 404 unknown_org when no organisation exists', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/v1/public/default-org' });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error.reason).toBe('unknown_org');
+  });
+
+  it('returns the organisation when exactly one exists', async () => {
+    await createOrgWithAdmin(testPool, { orgName: 'Cafe Works', slug: 'cafe-works', adminEmail: 'a@a.a', adminName: 'A' });
+    const res = await app.inject({ method: 'GET', url: '/api/v1/public/default-org' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().org).toMatchObject({ slug: 'cafe-works', name: 'Cafe Works' });
+  });
+
+  it('refuses to guess when several organisations exist', async () => {
+    await createOrgWithAdmin(testPool, { orgName: 'Cafe Works', slug: 'cafe-works', adminEmail: 'a@a.a', adminName: 'A' });
+    await createOrgWithAdmin(testPool, { orgName: 'Beta Space', slug: 'beta-space', adminEmail: 'b@b.b', adminName: 'B' });
+    const res = await app.inject({ method: 'GET', url: '/api/v1/public/default-org' });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error.reason).toBe('multiple_orgs');
+  });
+});
+
 describe('customer registration', () => {
   it('creates a customer account and returns a session token', async () => {
     await createOrgWithAdmin(testPool, { orgName: 'Cafe Works', slug: 'cafe-works', adminEmail: 'a@a.a', adminName: 'A' });

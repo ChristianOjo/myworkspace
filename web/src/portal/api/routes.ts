@@ -43,6 +43,12 @@ export function changePassword(currentPassword: string, newPassword: string) {
 }
 
 // Public catalogue (no token required)
+// Resolves the single organisation on a single-workspace deployment so the
+// visitor never has to type the slug. 404 when zero or several exist.
+export function defaultOrg() {
+  return api.get<{ org: PublicOrg }>('/public/default-org');
+}
+
 export function publicOrg(slug: string) {
   return api.get<{ org: PublicOrg }>(`/public/${encodeURIComponent(slug)}/org`);
 }

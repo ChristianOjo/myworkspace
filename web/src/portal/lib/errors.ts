@@ -8,6 +8,7 @@ const reasonMessages: Record<string, string> = {
   invalid_org_slug: 'Enter the organisation slug provided by your workspace.',
   unknown_org: 'We could not find that organisation. Check the slug and try again.',
   unknown_org_login: 'We could not find that organisation. Check the slug and try again.',
+  multiple_orgs: 'This portal serves several workspaces. Enter the slug for yours.',
   invalid_password: 'Use a password with at least 10 characters.',
   weak_password: 'Use a password with at least 10 characters.',
   email_taken: 'An account already uses this email. Sign in instead.',

@@ -67,6 +67,37 @@ async function resolveOrg(pool: Pool, slug: string): Promise<{ ok: true; orgId: 
   return { ok: true, orgId };
 }
 
+// Portal convenience endpoint for single-workspace deployments: the customer
+// should never have to type the organisation slug. Returns the only active
+// organisation; 404 when there are none (portal falls back to a manual field)
+// or several (the portal then asks the visitor which workspace they mean).
+export async function defaultPublicOrg(pool: Pool): Promise<{ ok: true; org: PublicOrg } | Failure> {
+  const idsRes = await pool.query<{ id: string }>(`SELECT id FROM list_org_ids() AS t(id)`);
+  const ids = idsRes.rows.map(row => row.id);
+
+  if (ids.length === 0) {
+    return fail(404, 'not_found', 'Organisation not found', 'unknown_org');
+  }
+  if (ids.length > 1) {
+    return fail(404, 'not_found', 'Multiple organisations on this service', 'multiple_orgs');
+  }
+
+  const orgId = ids[0];
+  const row = await withOrg(pool, orgId, async (client) => {
+    const res = await client.query(`SELECT id, name, slug FROM organizations WHERE id = $1`, [orgId]);
+    return res.rows[0] ?? null;
+  });
+
+  if (!row) {
+    return fail(404, 'not_found', 'Organisation not found', 'unknown_org');
+  }
+
+  return {
+    ok: true,
+    org: { id: row.id, name: row.name, slug: row.slug }
+  };
+}
+
 export async function publicOrg(pool: Pool, slug: string): Promise<{ ok: true; org: PublicOrg } | Failure> {
   const resolved = await resolveOrg(pool, slug);
   if (!resolved.ok) return resolved;
