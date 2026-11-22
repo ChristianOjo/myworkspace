@@ -33,9 +33,9 @@ export function PasswordDrawer({ open, onClose, notify }: { open: boolean; onClo
   return <Drawer open={open} title="Change password" onClose={onClose} width="420px">
     <div className="drawer-head"><p className="eyebrow">ACCOUNT / SECURITY</p><h2>Change password</h2><p className="muted">Keep your booking account secure.</p></div>
     <form className="form-stack drawer-form" onSubmit={submit}>
-      <label className="field-label">Current password<input type="password" autoComplete="current-password" required value={current} onChange={event => setCurrent(event.target.value)} /></label>
-      <label className="field-label">New password<input type="password" autoComplete="new-password" required minLength={10} value={next} onChange={event => setNext(event.target.value)} /><small className="field-hint">At least 10 characters.</small></label>
-      <label className="field-label">Confirm new password<input type="password" autoComplete="new-password" required minLength={10} value={confirm} onChange={event => setConfirm(event.target.value)} /></label>
+      <label className="field-label">Current password<input name="currentPassword" type="password" autoComplete="current-password" required value={current} onChange={event => setCurrent(event.target.value)} /></label>
+      <label className="field-label">New password<input name="newPassword" type="password" autoComplete="new-password" required minLength={10} value={next} onChange={event => setNext(event.target.value)} /><small className="field-hint">At least 10 characters.</small></label>
+      <label className="field-label">Confirm new password<input name="confirmPassword" type="password" autoComplete="new-password" required minLength={10} value={confirm} onChange={event => setConfirm(event.target.value)} /></label>
       {error && <div className="form-alert" role="alert">{error}</div>}
       <div className="drawer-actions"><button className="button button-primary" disabled={busy} type="submit">{busy ? 'Updating…' : 'Update password'}</button><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button></div>
     </form>

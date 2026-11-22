@@ -133,7 +133,7 @@ export function BookingDrawer({ open, resource, location, date, availability, pr
 
         {kind === 'hourly' ? <div className="form-grid-two">
           <label className="field-label">Starts
-            <select required value={start} onChange={event => setStart(event.target.value)}>
+            <select required name="start" value={start} onChange={event => setStart(event.target.value)}>
               <option value="">Choose a time</option>
               {startOptions.map(option => (
                 <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -143,7 +143,7 @@ export function BookingDrawer({ open, resource, location, date, availability, pr
             </select>
           </label>
           <label className="field-label">Duration
-            <select value={duration} onChange={event => setDuration(Number(event.target.value))}>
+            <select name="duration" value={duration} onChange={event => setDuration(Number(event.target.value))}>
               {durations.map(value => <option key={value} value={value}>{labelDuration(value)}</option>)}
             </select>
           </label>
@@ -153,7 +153,7 @@ export function BookingDrawer({ open, resource, location, date, availability, pr
           <input readOnly value={profileName} className="read-only-field" />
         </label>
         <label className="field-label">Contact phone <span className="optional-label">OPTIONAL</span>
-          <input maxLength={50} inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} autoComplete="tel" placeholder="Where can we reach you?" />
+          <input name="phone" maxLength={50} type="tel" inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} autoComplete="tel" placeholder="Where can we reach you?" />
         </label>
 
         <div className="price-preview">

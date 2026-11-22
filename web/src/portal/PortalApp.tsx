@@ -33,16 +33,28 @@ type Notice = { text: string; kind: 'success' | 'error' } | null;
 
 const SLUG_KEY = 'myworkspace.portal.slug';
 const CURRENCY_KEY = 'myworkspace.portal.currency';
+const QUERY_TAB = 'tab';
+const QUERY_DATE = 'date';
+const QUERY_LOCATION = 'loc';
+
+function readPortalQuery(): { tab: Tab; date: string; locationId: string } {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get(QUERY_TAB) === 'bookings' ? 'bookings' : 'browse';
+  const rawDate = params.get(QUERY_DATE) ?? '';
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : '';
+  const locationId = params.get(QUERY_LOCATION) ?? '';
+  return { tab, date, locationId };
+}
 
 export function PortalApp() {
   const [user, setUser] = useState<PortalUser | null>(null);
   const [slug, setSlug] = useState('');
   const [booting, setBooting] = useState(true);
-  const [tab, setTab] = useState<Tab>('browse');
+  const [tab, setTab] = useState<Tab>(() => readPortalQuery().tab);
   const [orgName, setOrgName] = useState('');
   const [locations, setLocations] = useState<PortalLocation[]>([]);
-  const [locationId, setLocationId] = useState('');
-  const [date, setDate] = useState(dateInZone());
+  const [locationId, setLocationId] = useState(() => readPortalQuery().locationId);
+  const [date, setDate] = useState(() => readPortalQuery().date || dateInZone());
   const [resources, setResources] = useState<PortalResource[]>([]);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [browseLoading, setBrowseLoading] = useState(false);
@@ -129,6 +141,25 @@ export function PortalApp() {
     if (!user || !locationId) return;
     void loadCatalog(slug, locationId, date);
   }, [user, slug, locationId, date, loadCatalog]);
+
+  // Keep the shareable state (tab, date, location) in the query string so a
+  // refreshed or shared link restores exactly what the customer was viewing.
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set(QUERY_TAB, tab);
+    if (tab === 'browse') {
+      if (date) params.set(QUERY_DATE, date); else params.delete(QUERY_DATE);
+      if (locationId) params.set(QUERY_LOCATION, locationId); else params.delete(QUERY_LOCATION);
+    } else {
+      params.delete(QUERY_DATE);
+      params.delete(QUERY_LOCATION);
+    }
+    const search = `?${params.toString()}`;
+    if (search !== window.location.search) {
+      window.history.replaceState(null, '', `${window.location.pathname}${search}`);
+    }
+  }, [user, tab, date, locationId]);
 
   const refreshBookings = useCallback(async () => {
     if (!user) return;
@@ -218,6 +249,7 @@ export function PortalApp() {
   </>;
 
   return <div className="app-shell portal-shell">
+    <a className="skip-link" href="#portal-main">Skip to main content</a>
     <header className="topbar">
       <a className="brand-lockup" href="/portal" aria-label="Myworkspace customer portal">
         <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
@@ -230,19 +262,19 @@ export function PortalApp() {
       <div className="topbar-spacer" />
       {location && <span className="topbar-location"><span className="location-marker" />{location.name}</span>}
       <details className="profile-menu">
-        <summary className="profile-trigger"><span className="profile-initials">{initials(user.fullName)}</span><span className="profile-copy"><b>{user.fullName}</b><small>Customer</small></span><span className="profile-chevron">⌄</span></summary>
+        <summary className="profile-trigger"><span className="profile-initials">{initials(user.fullName)}</span><span className="profile-copy"><b>{user.fullName}</b><small>Customer</small></span><span className="profile-chevron" aria-hidden="true">⌄</span></summary>
         <div className="profile-popover">
           <div className="profile-popover-head"><span className="section-index">ACCOUNT</span><b>{user.email}</b></div>
           {user.company && <p className="profile-popover-company muted">{user.company}</p>}
           {user.phone && <p className="profile-popover-phone muted">{user.phone}</p>}
-          <button className="profile-action" onClick={() => setPasswordOpen(true)}>Change password <span>↗</span></button>
-          <button className="profile-action" onClick={() => void handleLogout()}>Sign out <span>↗</span></button>
-          <a className="profile-action" href="/">Staff sign in <span>↗</span></a>
+          <button className="profile-action" onClick={() => setPasswordOpen(true)}>Change password <span aria-hidden="true">↗</span></button>
+          <button className="profile-action" onClick={() => void handleLogout()}>Sign out <span aria-hidden="true">↗</span></button>
+          <a className="profile-action" href="/">Staff sign in <span aria-hidden="true">↗</span></a>
         </div>
       </details>
     </header>
 
-    <main className="app-content">
+    <main className="app-content" id="portal-main">
       {tab === 'browse' && <BrowseView
         orgName={orgName}
         locations={locations}

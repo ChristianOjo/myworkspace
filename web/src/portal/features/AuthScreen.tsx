@@ -114,25 +114,25 @@ export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: str
             </div>
           ) : (
             <label className="field-label">Organisation slug
-              <input required autoComplete="organization" value={orgSlug} onChange={e => setOrgSlug(e.target.value)} placeholder="e.g. mws-desks" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={60} />
+              <input required name="orgSlug" autoComplete="organization" value={orgSlug} onChange={e => setOrgSlug(e.target.value)} placeholder="e.g. mws-desks" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={60} />
             </label>
           )}
           {mode === 'register' && <>
             <label className="field-label">Full name
-              <input required autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" maxLength={200} />
+              <input required name="fullName" autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" maxLength={200} />
             </label>
             <label className="field-label">Phone <span className="optional-label">OPTIONAL</span>
-              <input inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Contact number" maxLength={50} />
+              <input name="phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Contact number" maxLength={50} />
             </label>
             <label className="field-label">Company / employer <span className="optional-label">OPTIONAL</span>
-              <input autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} placeholder="Where do you work?" maxLength={200} />
+              <input name="company" autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} placeholder="Where do you work?" maxLength={200} />
             </label>
           </>}
           <label className="field-label">Email address
-            <input required type="email" autoComplete={mode === 'login' ? 'username' : 'email'} value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" />
+            <input required name="email" type="email" spellCheck={false} autoComplete={mode === 'login' ? 'username' : 'email'} value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" />
           </label>
           <label className="field-label">Password
-            <input required type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'login' ? 'Enter your password' : 'At least 10 characters'} minLength={10} />
+            <input required name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'login' ? 'Enter your password' : 'At least 10 characters'} minLength={10} />
           </label>
           {error && <div className="form-alert" role="alert">{error}</div>}
           <button className="button button-primary login-submit" type="submit" disabled={busy}>
