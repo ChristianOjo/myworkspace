@@ -20,7 +20,7 @@
 
 .portal-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .resource-label-mini { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.portal-card h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+.portal-card-title { margin: 0; font-size: 16px; letter-spacing: -.01em; }
 
 .portal-rates { display: flex; flex-wrap: wrap; gap: 22px; padding: 12px 0; border-top: 1px solid var(--line-light); border-bottom: 1px solid var(--line-light); }
 .portal-rates > div { display: grid; gap: 2px; }
@@ -61,8 +61,8 @@
 .portal-list-price small { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .portal-list-price b { font-family: "SFMono-Regular", Consolas, monospace; font-size: 16px; }
 .portal-list-note { font-size: 10px; }
-.profile-popover-company { margin: 2px 0 0; font-size: 11px; }
-.profile-popover-phone { margin: 4px 0 10px; font-size: 11px; }
+.profile-popover-company { margin: 2px 0 0; font-size: 11px; overflow-wrap: anywhere; }
+.profile-popover-phone { margin: 4px 0 10px; font-size: 11px; overflow-wrap: anywhere; }
 
 @media (max-width: 740px) {
   .portal-list-row { grid-template-columns: 1fr; }

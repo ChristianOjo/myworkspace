@@ -16,6 +16,8 @@ export function Drawer({ open, title, onClose, children, width = '460px' }: {
     if (!open) return;
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panel.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -47,6 +49,7 @@ export function Drawer({ open, title, onClose, children, width = '460px' }: {
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
       const target = returnFocus.current;
       if (target?.isConnected) window.requestAnimationFrame(() => target.focus());
     };

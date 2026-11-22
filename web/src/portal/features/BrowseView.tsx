@@ -40,12 +40,12 @@ export function BrowseView({ orgName, locations, locationId, onLocationChange, d
       </div>
       <div className="heading-actions">
         {locations.length > 1 && <label className="field-label compact-field">Location
-          <select value={locationId} onChange={event => onLocationChange(event.target.value)}>
+          <select name="locationId" value={locationId} onChange={event => onLocationChange(event.target.value)}>
             {locations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>}
         <label className="field-label compact-field">Date
-          <input type="date" value={date} min={dateInZone()} onChange={event => onDateChange(event.target.value)} />
+          <input name="date" type="date" value={date} min={dateInZone()} onChange={event => onDateChange(event.target.value)} />
         </label>
       </div>
     </div>
@@ -73,7 +73,7 @@ export function BrowseView({ orgName, locations, locationId, onLocationChange, d
               <span className="resource-label-mini">{TYPE_LABELS[resource.type] ?? resource.type}</span>
               {entry && busy > 0 ? <span className="status-badge status-confirmed"><span className="status-dot" aria-hidden="true" />Partly busy</span> : <span className="status-badge status-active"><span className="status-dot" aria-hidden="true" />Open today</span>}
             </div>
-            <h3>{resource.name}</h3>
+            <h2 className="portal-card-title">{resource.name}</h2>
             {resource.capacity > 0 && <p className="muted">Capacity: {resource.capacity} {resource.capacity === 1 ? 'person' : 'people'}</p>}
             <div className="portal-rates">
               {hasHourly && <div><span>Hourly</span><b>{money(resource.hourlyRateCents, currency)}</b><small>per hour</small></div>}
