@@ -233,6 +233,7 @@ export function PortalApp() {
         <summary className="profile-trigger"><span className="profile-initials">{initials(user.fullName)}</span><span className="profile-copy"><b>{user.fullName}</b><small>Customer</small></span><span className="profile-chevron">⌄</span></summary>
         <div className="profile-popover">
           <div className="profile-popover-head"><span className="section-index">ACCOUNT</span><b>{user.email}</b></div>
+          {user.company && <p className="profile-popover-company muted">{user.company}</p>}
           {user.phone && <p className="profile-popover-phone muted">{user.phone}</p>}
           <button className="profile-action" onClick={() => setPasswordOpen(true)}>Change password <span>↗</span></button>
           <button className="profile-action" onClick={() => void handleLogout()}>Sign out <span>↗</span></button>

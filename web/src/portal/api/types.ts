@@ -21,6 +21,7 @@ export interface PortalUser {
   fullName: string;
   role: PortalRole;
   phone: string | null;
+  company: string | null;
 }
 
 export interface PublicOrg {
@@ -97,6 +98,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   phone?: string;
+  company?: string;
 }
 
 export interface CreateMyBookingPayload {

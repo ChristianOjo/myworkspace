@@ -20,6 +20,7 @@ export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: str
   const [resolvingSlug, setResolvingSlug] = useState(DEFAULT_SLUG.length === 0);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,6 +66,7 @@ export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: str
           email: email.trim(),
           password,
           ...(phone.trim() ? { phone: phone.trim() } : {}),
+          ...(company.trim() ? { company: company.trim() } : {}),
         };
         const result = await register(payload);
         setToken(result.token);
@@ -121,6 +123,9 @@ export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: str
             </label>
             <label className="field-label">Phone <span className="optional-label">OPTIONAL</span>
               <input inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Contact number" maxLength={50} />
+            </label>
+            <label className="field-label">Company / employer <span className="optional-label">OPTIONAL</span>
+              <input autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} placeholder="Where do you work?" maxLength={200} />
             </label>
           </>}
           <label className="field-label">Email address
