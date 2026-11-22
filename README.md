@@ -113,7 +113,7 @@ All configuration is via environment variables. See `.env.example` and `web/.env
 | `RUN_MIGRATIONS_ON_START` | `false` | Run preflight and migrations at boot |
 | `BOOTSTRAP_*` | none | `ORG_NAME`, `ORG_SLUG`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD` (10–200 chars), optional `TIMEZONE` (default `UTC`). Creates the org on first boot; skipped if the slug already exists. All five required if any is set |
 | `VITE_API_BASE_URL` | `http://127.0.0.1:3000` | Web client only; set empty when the API serves the UI |
-| `VITE_DEFAULT_ORG_SLUG` | empty | Customer portal only; pre-fills the organisation slug on sign-in/register |
+| `VITE_DEFAULT_ORG_SLUG` | empty | Customer portal only; pins the workspace slug at build time. When empty, the portal calls `GET /public/default-org` and hides the slug field for the single deployed workspace |
 
 In production, `APP_DATABASE_URL` can be omitted if `APP_DB_HOST`, `APP_DB_NAME`, `APP_DB_PORT` and `APP_USER_PASSWORD` are set. The URL is built for you.
 
@@ -174,7 +174,7 @@ All routes are under `/api/v1`. The public catalogue and registration are unauth
 | Area | Endpoints |
 |---|---|
 | Health | `GET /health` |
-| Public catalogue | `GET /public/:slug/org`, `GET /public/:slug/locations`, `GET /public/:slug/resources`, `GET /public/:slug/availability` |
+| Public catalogue | `GET /public/default-org`, `GET /public/:slug/org`, `GET /public/:slug/locations`, `GET /public/:slug/resources`, `GET /public/:slug/availability` |
 | Auth | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password` |
 | Customer bookings | `GET /me/bookings`, `GET /me/bookings/:id`, `POST /me/bookings`, `POST /me/bookings/:id/cancel` |
 | Staff | `GET /staff`, `POST /staff`, `POST /staff/:id/deactivate`, `POST /staff/:id/password` |
@@ -188,7 +188,7 @@ All routes are under `/api/v1`. The public catalogue and registration are unauth
 ### Customer portal notes
 
 - The customer UI is served from `/portal`; the staff front desk remains at `/`.
-- A customer account is created through `POST /auth/register` with the org slug, name, email, password and optional phone. Staff accounts are still created by an admin.
+- A customer account is created through `POST /auth/register` with the org slug, name, email, password and optional phone. The slug still goes to the API because every account belongs to a workspace (tenant isolation), but the portal resolves it automatically on single-workspace deployments via `GET /public/default-org` so visitors never type it; the slug input remains as a fallback for multi-workspace installs. Staff accounts are still created by an admin.
 - `POST /me/bookings` creates a booking owned by the caller; the walk-in name on the booking comes from the profile. Customers cannot check themselves in or record payments.
 - Customers can cancel only their own `confirmed`, unpaid, upcoming bookings; paid and already-started bookings are handled by the front desk.
 - There is no online payment gateway in this build: reservations are confirmed and settled in cash at the desk, matching the existing cash flow.

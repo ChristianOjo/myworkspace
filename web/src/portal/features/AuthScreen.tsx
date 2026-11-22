@@ -1,16 +1,23 @@
-import { useState, type FormEvent } from 'react';
-import { login, register } from '../api/routes';
+import { useEffect, useState, type FormEvent } from 'react';
+import { defaultOrg, login, register } from '../api/routes';
 import { setToken } from '../api/client';
-import type { PortalUser, RegisterPayload } from '../api/types';
+import type { PortalUser, PublicOrg, RegisterPayload } from '../api/types';
 import { friendlyError } from '../lib/errors';
 
+// Pinned at build time (VITE_DEFAULT_ORG_SLUG) when a single workspace hosts
+// this portal. When empty, the form asks the API for the default organisation
+// and hides the slug field once it resolves; manual entry remains as a
+// fallback for multi-workspace deployments or when the lookup fails.
 const DEFAULT_SLUG: string = (import.meta.env.VITE_DEFAULT_ORG_SLUG as string | undefined) ?? '';
 
 type Mode = 'login' | 'register';
 
 export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: string) => void }) {
-  const [mode, setMode] = useState<Mode>(DEFAULT_SLUG ? 'login' : 'login');
+  const [mode, setMode] = useState<Mode>('login');
   const [orgSlug, setOrgSlug] = useState(DEFAULT_SLUG);
+  const [orgName, setOrgName] = useState('');
+  const [slugResolved, setSlugResolved] = useState(DEFAULT_SLUG.length > 0);
+  const [resolvingSlug, setResolvingSlug] = useState(DEFAULT_SLUG.length === 0);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -18,12 +25,35 @@ export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: str
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (DEFAULT_SLUG) return;
+    let active = true;
+    defaultOrg()
+      .then((result: { org: PublicOrg }) => {
+        if (!active) return;
+        setOrgSlug(result.org.slug);
+        setOrgName(result.org.name);
+        setSlugResolved(true);
+      })
+      .catch(() => {
+        if (active) setSlugResolved(false);
+      })
+      .finally(() => {
+        if (active) setResolvingSlug(false);
+      });
+    return () => { active = false; };
+  }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const cleanSlug = orgSlug.trim().toLowerCase();
+    if (!cleanSlug) {
+      setError('Enter the organisation slug provided by your workspace.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      const cleanSlug = orgSlug.trim().toLowerCase();
       if (mode === 'login') {
         const result = await login(cleanSlug, email.trim(), password);
         setToken(result.token);
@@ -74,9 +104,17 @@ export function AuthScreen({ onAuth }: { onAuth: (user: PortalUser, orgSlug: str
         <h2 id="portal-auth-heading">{mode === 'login' ? 'Welcome back.' : 'Create your account.'}</h2>
         <p className="muted">{mode === 'login' ? 'Sign in to view and manage your bookings.' : 'Registration takes a minute and lets you book spaces online.'}</p>
         <form onSubmit={submit} className="form-stack">
-          <label className="field-label">Organisation slug
-            <input required autoComplete="organization" value={orgSlug} onChange={e => setOrgSlug(e.target.value)} placeholder="e.g. mws-desks" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={60} />
-          </label>
+          {resolvingSlug ? (
+            <p className="small-note">Preparing this workspace…</p>
+          ) : slugResolved && orgSlug ? (
+            <div className="field-label">Organisation
+              <div className="read-only-field" aria-live="polite">{orgName || orgSlug}</div>
+            </div>
+          ) : (
+            <label className="field-label">Organisation slug
+              <input required autoComplete="organization" value={orgSlug} onChange={e => setOrgSlug(e.target.value)} placeholder="e.g. mws-desks" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={60} />
+            </label>
+          )}
           {mode === 'register' && <>
             <label className="field-label">Full name
               <input required autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" maxLength={200} />
